@@ -1,6 +1,9 @@
+db/*.db
+logs/
 node_modules
 public/uploads/
-logs/
+temp/
 
 # ignore real env from repo
 .env
+package-lock.json
