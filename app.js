@@ -35,6 +35,7 @@ const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const streamingService = require('./services/streamingService');
 const schedulerService = require('./services/schedulerService');
 const packageJson = require('./package.json');
+const { getOverlaySettings, saveOverlaySettings } = require('./models/overlayModel');
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 process.on('unhandledRejection', (reason, promise) => {
   console.error('-----------------------------------');
@@ -51,6 +52,24 @@ const app = express();
 app.set("trust proxy", 1);
 const port = process.env.PORT || 7575;
 const tokens = new csrf();
+const overlayStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = 'public/uploads/overlay';
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `overlay_${req.session.userId}${ext}`);
+  }
+});
+const overlayUpload = multer({ 
+  storage: overlayStorage,
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+    cb(null, allowed.includes(path.extname(file.originalname).toLowerCase()));
+  }
+});
 
 ensureDirectories();
 app.locals.helpers = {
@@ -116,6 +135,7 @@ app.locals.helpers = {
     return `${hours}:${minutes}:${secs}`;
   }
 };
+
 app.use(session({
   store: new SQLiteStore({
     db: 'sessions.db',
@@ -633,6 +653,65 @@ app.post('/setup-account', upload.single('avatar'), [
 });
 app.get('/', (req, res) => {
   res.redirect('/dashboard');
+});
+
+// GET - halaman pengaturan overlay
+app.get('/overlay', isAuthenticated, async (req, res) => {
+  try {
+    const settings = getOverlaySettings(req.session.userId) || {};
+    const user = await User.findById(req.session.userId);
+    res.render('overlay', { 
+      title: 'Overlay Logo',
+      active: 'overlay',
+      user: user,
+      settings 
+    });
+  } catch (error) {
+    console.error('Overlay error:', error);
+    res.redirect('/dashboard');
+  }
+});
+
+// POST - simpan pengaturan
+app.post('/overlay/settings', isAuthenticated, (req, res) => {
+  const { enabled, position_x, position_y, width, height, opacity } = req.body;
+  const existing = getOverlaySettings(req.session.userId);
+  
+  saveOverlaySettings(req.session.userId, {
+    enabled: enabled === 'on' || enabled === '1',
+    image_path: existing?.image_path ?? null,
+    position_x: parseInt(position_x) || 10,
+    position_y: parseInt(position_y) || 10,
+    width: parseInt(width) || 150,
+    height: parseInt(height) || 150,
+    opacity: parseFloat(opacity) || 1.0
+  });
+  
+  res.json({ success: true });
+});
+
+// POST - upload gambar overlay
+app.post('/overlay/upload', isAuthenticated, overlayUpload.single('logo'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'File tidak valid' });
+  
+  const existing = getOverlaySettings(req.session.userId);
+  saveOverlaySettings(req.session.userId, {
+    ...(existing || {}),
+    image_path: req.file.path.replace(/\\/g, '/'),
+    enabled: existing?.enabled ?? 0
+  });
+  
+  res.json({ success: true, path: `/${req.file.path}` });
+});
+
+// DELETE - hapus logo
+app.delete('/overlay/logo', isAuthenticated, (req, res) => {
+  const existing = getOverlaySettings(req.session.userId);
+  if (existing?.image_path) {
+    fs.unlink(existing.image_path, () => {});
+    saveOverlaySettings(req.session.userId, { ...existing, image_path: null, enabled: 0 });
+  }
+  res.json({ success: true });
 });
 app.get('/welcome', isAuthenticated, async (req, res) => {
   try {

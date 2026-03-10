@@ -7,6 +7,7 @@ const { db } = require('../db/database');
 const Stream = require('../models/Stream');
 const Playlist = require('../models/Playlist');
 const Video = require('../models/Video');
+const { getOverlaySettings } = require('../models/overlayModel');
 
 let ffmpegPath;
 if (fs.existsSync('/usr/bin/ffmpeg')) {
@@ -261,6 +262,108 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
   ];
 }
 
+function buildOverlayFilter(overlay) {
+  if (!overlay || !overlay.enabled || !overlay.image_path) return null;
+  
+  const opacity = Math.min(1, Math.max(0, overlay.opacity ?? 1));
+  const x = overlay.position_x ?? 10;
+  const y = overlay.position_y ?? 10;
+  const w = overlay.width ?? 150;
+  const h = overlay.height ?? 150;
+  
+  // FFmpeg overlay filter: scale logo → atur opacity → overlay ke posisi
+  return `movie='${overlay.image_path.replace(/\\/g, '/')}',scale=${w}:${h},format=rgba,colorchannelmixer=aa=${opacity}[logo];[in][logo]overlay=${x}:${y}[out]`;
+}
+
+// async function buildFFmpegArgs(stream) {
+//   const streamWithVideo = await Stream.getStreamWithVideo(stream.id);
+
+//   if (streamWithVideo && streamWithVideo.video_type === 'playlist') {
+//     const playlist = await Playlist.findByIdWithVideos(stream.video_id);
+//     if (!playlist) {
+//       throw new Error('Playlist not found');
+//     }
+//     return await buildFFmpegArgsForPlaylist(stream, playlist);
+//   }
+
+//   const video = await Video.findById(stream.video_id);
+//   if (!video) {
+//     throw new Error('Video not found');
+//   }
+
+//   const relPath = video.filepath.startsWith('/') ? video.filepath.substring(1) : video.filepath;
+//   const projectRoot = path.resolve(__dirname, '..');
+//   const videoPath = path.join(projectRoot, 'public', relPath);
+
+//   if (!fs.existsSync(videoPath)) {
+//     throw new Error(`Video file not found: ${videoPath}`);
+//   }
+
+//   const rtmpUrl = `${stream.rtmp_url.replace(/\/$/, '')}/${stream.stream_key}`;
+//   const loopValue = stream.loop_video ? '-1' : '0';
+
+//   const overlay = getOverlaySettings(userId);
+//   const overlayFilter = buildOverlayFilter(overlay);
+
+//   const vfFilter = overlayFilter
+//   ? `scale=${width}:${height},${overlayFilter}`  // gabungkan dengan filter yang ada
+//   : `scale=${width}:${height}`;
+
+//   if (!stream.use_advanced_settings) {
+//     return [
+//       '-nostdin',
+//       '-loglevel', 'warning',
+//       '-stats',
+//       '-re',
+//       '-fflags', '+genpts+igndts+discardcorrupt',
+//       '-avoid_negative_ts', 'make_zero',
+//       '-stream_loop', loopValue,
+//       '-i', videoPath,
+//       '-c:v', 'copy',
+//       '-c:a', 'copy',
+//       '-bsf:a', 'aac_adtstoasc',
+//       '-f', 'flv', vfFilter,
+//       '-flvflags', 'no_duration_filesize',
+//       rtmpUrl
+//     ];
+//   }
+
+//   const resolution = stream.resolution || '1280x720';
+//   const bitrate = stream.bitrate || 2500;
+//   const fps = stream.fps || 30;
+
+//   return [
+//     '-nostdin',
+//     '-loglevel', 'warning',
+//     '-stats',
+//     '-re',
+//     '-fflags', '+genpts+igndts+discardcorrupt',
+//     '-avoid_negative_ts', 'make_zero',
+//     '-stream_loop', loopValue,
+//     '-i', videoPath,
+//     '-c:v', 'libx264',
+//     '-preset', 'veryfast',
+//     '-tune', 'zerolatency',
+//     '-profile:v', 'high',
+//     '-level', '4.1',
+//     '-b:v', `${bitrate}k`,
+//     '-maxrate', `${Math.round(bitrate * 1.1)}k`,
+//     '-bufsize', `${bitrate * 2}k`,
+//     '-pix_fmt', 'yuv420p',
+//     '-g', String(fps * 2),
+//     '-keyint_min', String(fps),
+//     '-sc_threshold', '0',
+//     '-s', resolution,
+//     '-r', String(fps),
+//     '-c:a', 'aac',
+//     '-b:a', '128k',
+//     '-ar', '44100',
+//     '-ac', '2',
+//     '-f', 'flv', vfFilter,
+//     '-flvflags', 'no_duration_filesize',
+//     rtmpUrl
+//   ];
+// }
 async function buildFFmpegArgs(stream) {
   const streamWithVideo = await Stream.getStreamWithVideo(stream.id);
 
@@ -288,7 +391,35 @@ async function buildFFmpegArgs(stream) {
   const rtmpUrl = `${stream.rtmp_url.replace(/\/$/, '')}/${stream.stream_key}`;
   const loopValue = stream.loop_video ? '-1' : '0';
 
+  // FIX 1: gunakan stream.user_id bukan userId
+  const overlay = getOverlaySettings(stream.user_id);
+  const overlayFilter = buildOverlayFilter(overlay);
+
   if (!stream.use_advanced_settings) {
+    // FIX 2: branch copy — jika ada overlay, terpaksa re-encode video
+    if (overlayFilter) {
+      return [
+        '-nostdin',
+        '-loglevel', 'warning',
+        '-stats',
+        '-re',
+        '-fflags', '+genpts+igndts+discardcorrupt',
+        '-avoid_negative_ts', 'make_zero',
+        '-stream_loop', loopValue,
+        '-i', videoPath,
+        '-vf', overlayFilter,       // FIX 3: -vf sebagai flag tersendiri
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-tune', 'zerolatency',
+        '-pix_fmt', 'yuv420p',
+        '-c:a', 'copy',
+        '-bsf:a', 'aac_adtstoasc',
+        '-f', 'flv',
+        '-flvflags', 'no_duration_filesize',
+        rtmpUrl
+      ];
+    }
+
     return [
       '-nostdin',
       '-loglevel', 'warning',
@@ -310,6 +441,13 @@ async function buildFFmpegArgs(stream) {
   const resolution = stream.resolution || '1280x720';
   const bitrate = stream.bitrate || 2500;
   const fps = stream.fps || 30;
+
+  // FIX 4: gunakan resolution dari stream, bukan variabel width/height yang tidak ada
+  const [width, height] = resolution.split('x');
+  const scaleFilter = `scale=${width}:${height}`;
+  const vfFilter = overlayFilter
+    ? `${scaleFilter},${overlayFilter}`
+    : scaleFilter;
 
   return [
     '-nostdin',
@@ -334,6 +472,7 @@ async function buildFFmpegArgs(stream) {
     '-sc_threshold', '0',
     '-s', resolution,
     '-r', String(fps),
+    '-vf', vfFilter,                // FIX 3: posisi benar sebagai flag tersendiri
     '-c:a', 'aac',
     '-b:a', '128k',
     '-ar', '44100',
@@ -343,7 +482,6 @@ async function buildFFmpegArgs(stream) {
     rtmpUrl
   ];
 }
-
 
 async function killFFmpegProcess(streamId, streamData) {
   return new Promise((resolve) => {
@@ -701,7 +839,6 @@ function getActiveStreamInfo(streamId) {
     retryCount: streamRetryCount.get(streamId) || 0
   };
 }
-
 
 async function syncStreamStatuses() {
   try {

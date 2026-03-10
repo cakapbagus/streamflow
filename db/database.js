@@ -16,6 +16,21 @@ const db = new sqlite3.Database(dbPath, (err) => {
 function createTables() {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
+      db.run(` CREATE TABLE IF NOT EXISTS overlay_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL UNIQUE,
+        enabled INTEGER DEFAULT 0,
+        image_path TEXT,
+        position_x INTEGER DEFAULT 10,
+        position_y INTEGER DEFAULT 10,
+        width INTEGER DEFAULT 150,
+        height INTEGER DEFAULT 150,
+        opacity REAL DEFAULT 1.0,
+        created_at DATETIME DEFAULT (datetime('now')),
+        updated_at DATETIME DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )`);
+
       db.run(`CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,

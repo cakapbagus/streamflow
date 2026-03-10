@@ -8,7 +8,7 @@ async function getSystemStats() {
     const [cpuData, memData, networkData, diskData] = await Promise.all([
       si.currentLoad(),
       si.mem(),
-      si.networkStats(),
+      si.networkStats('*'),
       getDiskUsage()
     ]);
     
