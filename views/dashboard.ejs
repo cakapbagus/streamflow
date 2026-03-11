@@ -392,6 +392,22 @@
               </div>
             </div>
             <div class="space-y-4">
+              <!-- Info panel: Simple mode playlist encoding (hanya muncul saat pilih playlist) -->
+              <div id="simpleModeInfoPanel" class="hidden rounded-lg border border-blue-600/30 bg-blue-900/10 p-3">
+                <div class="flex items-start gap-2">
+                  <i class="ti ti-info-circle text-blue-400 text-sm mt-0.5 flex-shrink-0"></i>
+                  <div>
+                    <p class="text-blue-200 text-xs font-medium mb-1">Simple Mode — Playlist Encoding</p>
+                    <p class="text-blue-300/70 text-xs mb-2">Playlist always will be re-encoded automatically to ensure all videos can stream smoothly.</p>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-400">
+                      <span><span class="text-gray-500">Resolution</span> · <span class="text-white font-mono">1280×720</span></span>
+                      <span><span class="text-gray-500">Frame Rate</span> · <span class="text-white font-mono">30 fps</span></span>
+                      <span><span class="text-gray-500">Video Codec</span> · <span class="text-white font-mono">libx264 veryfast</span></span>
+                      <span><span class="text-gray-500">Video Bitrate</span> · <span class="text-white font-mono">2500 kbps</span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div class="pt-2 border-t border-gray-700">
                 <button type="button" id="advancedSettingsToggle"
                   class="flex items-center justify-between w-full text-left">
@@ -861,6 +877,22 @@
               </div>
             </div>
             <div class="space-y-4">
+              <!-- Info panel: Simple mode playlist encoding (hanya muncul saat pilih playlist) -->
+              <div id="editSimpleModeInfoPanel" class="hidden rounded-lg border border-blue-600/30 bg-blue-900/10 p-3">
+                <div class="flex items-start gap-2">
+                  <i class="ti ti-info-circle text-blue-400 text-sm mt-0.5 flex-shrink-0"></i>
+                  <div>
+                    <p class="text-blue-200 text-xs font-medium mb-1">Simple Mode — Playlist Encoding</p>
+                    <p class="text-blue-300/70 text-xs mb-2">Playlist always will be re-encoded automatically to ensure all videos can stream smoothly.</p>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-400">
+                      <span><span class="text-gray-500">Resolution</span> · <span class="text-white font-mono">1280×720</span></span>
+                      <span><span class="text-gray-500">Frame Rate</span> · <span class="text-white font-mono">30 fps</span></span>
+                      <span><span class="text-gray-500">Video Codec</span> · <span class="text-white font-mono">libx264 veryfast</span></span>
+                      <span><span class="text-gray-500">Video Bitrate</span> · <span class="text-white font-mono">2500 kbps</span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div class="pt-2 border-t border-gray-700">
                 <button type="button" id="editAdvancedSettingsToggle"
                   class="flex items-center justify-between w-full text-left">
@@ -3336,6 +3368,9 @@
         modal.classList.add('active');
       });
       updateDurationBadge(true);
+      if (typeof updateEditSimpleModePanel === 'function') {
+        updateEditSimpleModePanel();
+      }
     }
     
     function formatDateTimeLocal(date) {
@@ -3348,6 +3383,9 @@
       return `${year}-${month}-${day}T${hours}:${minutes}`;
     }
     function closeEditStreamModal() {
+      const panel = document.getElementById('editSimpleModeInfoPanel');
+      if (panel) panel.classList.add('hidden');
+      
       const modal = document.getElementById('editStreamModal');
       
       modal.classList.remove('active');
@@ -3831,6 +3869,13 @@
           } else {
             content.classList.add('hidden');
           }
+          
+          if (typeof updateSimpleModePanel === 'function' && checkboxId === 'advancedSettingsCheckbox') {
+            updateSimpleModePanel();
+          }
+          if (typeof updateEditSimpleModePanel === 'function' && checkboxId === 'editAdvancedSettingsCheckbox') {
+            updateEditSimpleModePanel();
+          }
         });
       }
     }
@@ -4207,6 +4252,87 @@
         });
       }
     });
+
+    // ─── Simple Mode Info Panel ──────────────────────────────────────────────
+    // Tampilkan panel encoding info saat playlist dipilih di new stream modal dan advanced settings off
+    function updateSimpleModePanel() {
+      const panel = document.getElementById('simpleModeInfoPanel');
+      if (!panel) return;
+      
+      const selectedVideoSpan = document.getElementById('selectedVideo');
+      const displayText = selectedVideoSpan ? (selectedVideoSpan.textContent || '') : '';
+      const isPlaylist = displayText.startsWith('[Playlist]');
+      
+      const advancedSettingsCheckbox = document.getElementById('advancedSettingsCheckbox');
+      const isAdvancedOn = advancedSettingsCheckbox ? advancedSettingsCheckbox.checked : false;
+
+      if (isPlaylist && !isAdvancedOn) {
+        panel.classList.remove('hidden');
+      } else {
+        panel.classList.add('hidden');
+      }
+    }
+    
+    function updateEditSimpleModePanel() {
+      const panel = document.getElementById('editSimpleModeInfoPanel');
+      if (!panel) return;
+      
+      const selectedVideoSpan = document.getElementById('editSelectedVideo');
+      const displayText = selectedVideoSpan ? (selectedVideoSpan.textContent || '') : '';
+      const isPlaylist = displayText.startsWith('[Playlist]');
+      
+      const advancedSettingsCheckbox = document.getElementById('editAdvancedSettingsCheckbox');
+      const isAdvancedOn = advancedSettingsCheckbox ? advancedSettingsCheckbox.checked : false;
+
+      if (isPlaylist && !isAdvancedOn) {
+        panel.classList.remove('hidden');
+      } else {
+        panel.classList.add('hidden');
+      }
+    }
+
+    // Hook melalui MutationObserver pada selectedVideoId agar terdeteksi saat
+    // selectVideo() atau selectEditVideo() mengubah nilainya secara programatik.
+    document.addEventListener('DOMContentLoaded', function() {
+      // Observe #selectedVideoId (new stream modal)
+      const videoIdInput = document.getElementById('selectedVideoId');
+      const selectedVideoSpan = document.getElementById('selectedVideo');
+      if (videoIdInput && selectedVideoSpan) {
+        const observer = new MutationObserver(function() {
+          updateSimpleModePanel();
+        });
+        observer.observe(selectedVideoSpan, { childList: true, subtree: true, characterData: true });
+      }
+      
+      // Observe #editSelectedVideoId (edit stream modal)
+      const editVideoIdInput = document.getElementById('editSelectedVideoId');
+      const editSelectedVideoSpan = document.getElementById('editSelectedVideo');
+      if (editVideoIdInput && editSelectedVideoSpan) {
+        const observerEdit = new MutationObserver(function() {
+          updateEditSimpleModePanel();
+        });
+        observerEdit.observe(editSelectedVideoSpan, { childList: true, subtree: true, characterData: true });
+      }
+    });
+
+    // Patch closeNewStreamModal agar panel juga direset
+    const _origCloseNewStreamModal = typeof closeNewStreamModal === 'function' ? closeNewStreamModal : null;
+    function closeNewStreamModal() {
+      const panel = document.getElementById('simpleModeInfoPanel');
+      if (panel) panel.classList.add('hidden');
+      if (_origCloseNewStreamModal) _origCloseNewStreamModal();
+      else {
+        const modal = document.getElementById('newStreamModal');
+        if (modal) {
+          modal.classList.remove('active');
+          setTimeout(() => {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+          }, 200);
+        }
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
   </script>
 
   <div id="toast" class="fixed top-16 right-4 bg-dark-800 text-white px-4 py-3 rounded-lg shadow-lg z-50 hidden flex items-center">
