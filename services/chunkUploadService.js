@@ -81,7 +81,14 @@ async function saveChunk(uploadId, chunkIndex, chunkData) {
     };
   }
   const chunkPath = getChunkPath(uploadId, chunkIndex);
-  await fs.writeFile(chunkPath, chunkData);
+  try {
+    await fs.writeFile(chunkPath, chunkData);
+  } catch (err) {
+    if (err.code === 'ENOSPC') {
+      throw new Error('ENOSPC: Server disk is full. Cannot save upload chunk.');
+    }
+    throw err;
+  }
   info.uploadedChunks.push(chunkIndex);
   info.uploadedChunks.sort((a, b) => a - b);
   info.lastActivity = Date.now();
@@ -120,16 +127,30 @@ async function mergeChunks(uploadId) {
   const finalFilename = `${basename}-${timestamp}-${random}${ext}`;
   const finalPath = path.join(VIDEOS_DIR, finalFilename);
   const writeStream = fs.createWriteStream(finalPath);
-  for (let i = 0; i < info.totalChunks; i++) {
-    const chunkPath = getChunkPath(uploadId, i);
-    const chunkData = await fs.readFile(chunkPath);
-    writeStream.write(chunkData);
+  try {
+    for (let i = 0; i < info.totalChunks; i++) {
+      const chunkPath = getChunkPath(uploadId, i);
+      await new Promise((resolve, reject) => {
+        const readStream = fs.createReadStream(chunkPath);
+        readStream.on('error', reject);
+        readStream.on('end', resolve);
+        readStream.pipe(writeStream, { end: false });
+      });
+    }
+    await new Promise((resolve, reject) => {
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+      writeStream.end();
+    });
+  } catch (err) {
+    // Close the stream and remove the incomplete merged file to free disk space
+    await new Promise((resolve) => writeStream.destroy(null, resolve)).catch(() => {});
+    await fs.remove(finalPath).catch(() => {});
+    if (err.code === 'ENOSPC') {
+      throw new Error('ENOSPC: Server disk is full. Cannot merge video file.');
+    }
+    throw err;
   }
-  await new Promise((resolve, reject) => {
-    writeStream.on('finish', resolve);
-    writeStream.on('error', reject);
-    writeStream.end();
-  });
   info.status = 'completed';
   info.finalFilename = finalFilename;
   await fs.writeJson(getInfoPath(uploadId), info);

@@ -115,7 +115,12 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
       content += `file '${vp.replace(/\\/g, '/')}'\n`;
     }
   }
-  fs.writeFileSync(concatFile, content);
+  try {
+    fs.writeFileSync(concatFile, content);
+  } catch (err) {
+    if (err.code === 'ENOSPC') throw new Error('ENOSPC: Server disk is full. Cannot write playlist file.');
+    throw err;
+  }
 
   const hasAudio = playlist.audios && playlist.audios.length > 0;
 
@@ -214,7 +219,12 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
       audioContent += `file '${ap.replace(/\\/g, '/')}'\n`;
     }
   }
-  fs.writeFileSync(audioConcatFile, audioContent);
+  try {
+    fs.writeFileSync(audioConcatFile, audioContent);
+  } catch (err) {
+    if (err.code === 'ENOSPC') throw new Error('ENOSPC: Server disk is full. Cannot write audio playlist file.');
+    throw err;
+  }
 
   if (!stream.use_advanced_settings) {
     // Simple mode with custom audio: force re-encode video ke 1280x720 @ 30fps,
@@ -1089,12 +1099,20 @@ async function gracefulShutdown() {
 }
 
 process.on('SIGTERM', async () => {
-  await gracefulShutdown();
+  try {
+    await gracefulShutdown();
+  } catch (e) {
+    console.error('[StreamingService] Error during SIGTERM shutdown:', e);
+  }
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  await gracefulShutdown();
+  try {
+    await gracefulShutdown();
+  } catch (e) {
+    console.error('[StreamingService] Error during SIGINT shutdown:', e);
+  }
   process.exit(0);
 });
 

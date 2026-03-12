@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +11,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="preload" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.30.0/fonts/tabler-icons.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.30.0/fonts/tabler-icons.woff2"
+    as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.30.0/tabler-icons.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -57,19 +59,20 @@
   </script>
   <script src="/js/stream-modal.js" defer></script>
   <script>
-     if ('serviceWorker' in navigator) {
-       window.addEventListener('load', function() {
-         navigator.serviceWorker.register('/sw.js')
-           .then(function(registration) {
-             console.log('Service Worker registered successfully:', registration.scope);
-           })
-           .catch(function(error) {
-             console.log('Service Worker registration failed:', error);
-           });
-       });
-     }
-   </script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js')
+          .then(function (registration) {
+            console.log('Service Worker registered successfully:', registration.scope);
+          })
+          .catch(function (error) {
+            console.log('Service Worker registration failed:', error);
+          });
+      });
+    }
+  </script>
 </head>
+
 <body class="bg-dark-900 text-white font-inter">
   <div
     class="lg:hidden fixed top-0 left-0 right-0 h-16 bg-dark-800 shadow-lg flex items-center justify-between px-6 z-30">
@@ -83,10 +86,6 @@
         <span id="mobile-server-clock" class="tabular-nums">--:--:--</span>
       </div>
       <div id="mobile-separator" class="hidden h-4 w-px bg-gray-600 mr-1"></div>
-      <a href="https://donate.youtube101.id/" target="_blank" 
-         class="p-2 text-gray-400 hover:text-white transition-colors">
-        <i class="ti ti-gift text-lg"></i>
-      </a>
       <div class="relative">
         <button id="mobile-notification-btn" class="p-2 text-gray-400 hover:text-white transition-colors relative">
           <i class="ti ti-bell text-lg"></i>
@@ -126,13 +125,13 @@
           <span class="text-xs mt-1">History</span>
           <span class="sidebar-tooltip group-hover:scale-100">Stream History</span>
         </a>
-        <% if (req.session && req.session.user_role === 'admin') { %>
-        <a href="/users" class="sidebar-icon group <%= active === 'users' ? 'bg-primary' : '' %>">
-          <i class="ti ti-users text-xl"></i>
-          <span class="text-xs mt-1">Users</span>
-          <span class="sidebar-tooltip group-hover:scale-100">User Management</span>
-        </a>
-        <% } %>
+        <% if (req.session && req.session.user_role==='admin' ) { %>
+          <a href="/users" class="sidebar-icon group <%= active === 'users' ? 'bg-primary' : '' %>">
+            <i class="ti ti-users text-xl"></i>
+            <span class="text-xs mt-1">Users</span>
+            <span class="sidebar-tooltip group-hover:scale-100">User Management</span>
+          </a>
+          <% } %>
       </div>
       <div class="mt-auto">
         <div class="h-px bg-gray-700 w-full"></div>
@@ -157,8 +156,9 @@
         <i class="ti ti-settings mr-3"></i>
         <span>Settings</span>
       </a>
-      <a href="https://github.com/bangtutorial/streamflow/issues"
-        class="flex items-center px-4 py-2.5 text-sm text-gray-300 hover:bg-dark-700 hover:text-white transition-colors" target="_blank">
+      <a href="https://github.com/cakapbagus/streamflow/issues"
+        class="flex items-center px-4 py-2.5 text-sm text-gray-300 hover:bg-dark-700 hover:text-white transition-colors"
+        target="_blank">
         <i class="ti ti-help mr-3"></i>
         <span>Help & Support</span>
       </a>
@@ -177,7 +177,7 @@
           <span id="server-clock" class="tabular-nums">--:--:--</span>
         </div>
         <div class="h-4 w-px bg-gray-600 mr-4"></div>
-        <a href="https://github.com/bangtutorial/streamflow" target="_blank"
+        <a href="https://github.com/cakapbagus/streamflow" target="_blank"
           class="p-2 text-gray-400 hover:text-white transition-colors mr-2">
           <i class="ti ti-brand-github text-lg"></i>
         </a>
@@ -204,19 +204,6 @@
           <div class="text-xs text-gray-500">
             StreamFlow <span class="text-xs font-medium bg-gray-700 px-1 rounded">v<%= appVersion %></span>
           </div>
-          <div class="h-3 w-px bg-gray-700"></div>
-          <a href="https://youtube.com/@bangtutorial" target="_blank" class="text-xs text-gray-500 hover:underline">by
-            Bang Tutorial</a>
-          <a href="https://saweria.co/fitrieffendi" target="_blank" class="saweria-button relative ml-1">
-            <span class="relative z-10 flex items-center gap-1.5 text-gray-800 font-medium px-2.5 py-1 text-xs">
-              <img src="/images/saweria.svg" alt="Saweria" class="w-3.5 h-3.5">
-              <span>Donate</span>
-            </span>
-            <div class="saweria-tooltip px-3 py-2 bg-white text-gray-800 text-xs rounded-lg shadow-lg whitespace-nowrap">
-              Terima kasih sudah bantu support 🙏
-              <div class="tooltip-arrow"></div>
-            </div>
-          </a>
         </div>
       </div>
     </div>
@@ -258,21 +245,21 @@
           <%= req.session.email || '' %>
         </div>
         <div class="h-px bg-gray-700 my-2"></div>
-        <% if (req.session && req.session.user_role === 'admin') { %>
-        <a href="/users" class="flex items-center py-2 text-gray-300 hover:text-white text-sm">
-          <i class="ti ti-users mr-2"></i>
-          <span>Users</span>
-        </a>
-        <% } %>
-        <a href="/settings" class="flex items-center py-2 text-gray-300 hover:text-white text-sm">
-          <i class="ti ti-settings mr-2"></i>
-          <span>Settings</span>
-        </a>
-        <div class="h-px bg-gray-700 my-2"></div>
-        <a href="/logout" class="flex items-center py-2 text-red-400 hover:text-red-300 text-sm">
-          <i class="ti ti-logout mr-2"></i>
-          <span>Sign Out</span>
-        </a>
+        <% if (req.session && req.session.user_role==='admin' ) { %>
+          <a href="/users" class="flex items-center py-2 text-gray-300 hover:text-white text-sm">
+            <i class="ti ti-users mr-2"></i>
+            <span>Users</span>
+          </a>
+          <% } %>
+            <a href="/settings" class="flex items-center py-2 text-gray-300 hover:text-white text-sm">
+              <i class="ti ti-settings mr-2"></i>
+              <span>Settings</span>
+            </a>
+            <div class="h-px bg-gray-700 my-2"></div>
+            <a href="/logout" class="flex items-center py-2 text-red-400 hover:text-red-300 text-sm">
+              <i class="ti ti-logout mr-2"></i>
+              <span>Sign Out</span>
+            </a>
       </div>
     </div>
   </div>
@@ -284,19 +271,23 @@
     <div class="max-h-80 overflow-y-auto" id="mobile-notification-list">
     </div>
   </div>
-  <div id="streamflowUpdateModal" class="fixed inset-0 bg-black/60 z-[60] hidden items-center justify-center p-4 overflow-y-auto">
-    <div class="bg-dark-800 rounded-xl shadow-xl w-full max-w-2xl m-auto flex flex-col max-h-[90vh] border border-gray-700/50">
+  <div id="streamflowUpdateModal"
+    class="fixed inset-0 bg-black/60 z-[60] hidden items-center justify-center p-4 overflow-y-auto">
+    <div
+      class="bg-dark-800 rounded-xl shadow-xl w-full max-w-2xl m-auto flex flex-col max-h-[90vh] border border-gray-700/50">
       <div class="flex-shrink-0 flex items-center justify-between px-5 py-2 border-b border-gray-700/50">
         <h3 class="text-lg font-medium text-white flex items-center gap-2">
           <span class="text-base">🎉 Update StreamFlow v2</span>
         </h3>
-        <button onclick="closeStreamflowUpdateModal()" class="text-gray-400 hover:text-white hover:bg-gray-700/50 px-2 py-1 rounded-lg transition-colors">
+        <button onclick="closeStreamflowUpdateModal()"
+          class="text-gray-400 hover:text-white hover:bg-gray-700/50 px-2 py-1 rounded-lg transition-colors">
           <i class="ti ti-x text-lg"></i>
         </button>
       </div>
       <div class="p-5 overflow-y-auto text-gray-300 space-y-4">
-        <p class="text-sm">Terima kasih buat teman-teman yang sudah menunggu. Berikut adalah update terbaru yang ada di StreamFlow v2:</p>
-        
+        <p class="text-sm">Terima kasih buat teman-teman yang sudah menunggu. Berikut adalah update terbaru yang ada di
+          StreamFlow v2:</p>
+
         <div class="space-y-4">
           <div class="flex items-start gap-3">
             <div class="shrink-0">
@@ -306,10 +297,11 @@
             </div>
             <div>
               <h4 class="font-medium text-white text-sm">UI Baru yang Lebih Fresh</h4>
-              <p class="text-gray-300 mt-1 text-sm">Tampilan baru yang lebih fresh dan user freindly. Sudah dibikin senyaman mungkin untuk kebutuhan live streaming.</p>
+              <p class="text-gray-300 mt-1 text-sm">Tampilan baru yang lebih fresh dan user freindly. Sudah dibikin
+                senyaman mungkin untuk kebutuhan live streaming.</p>
             </div>
           </div>
-          
+
           <div class="flex items-start gap-3">
             <div class="shrink-0">
               <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center">
@@ -318,10 +310,11 @@
             </div>
             <div>
               <h4 class="font-medium text-white text-sm">Live Streaming Lebih Ringan</h4>
-              <p class="text-gray-300 mt-1 text-sm">Di StreamFlow v2, proses streaming sudah dioptimalkan, sehingga jauh lebih ringan dibandingkan StreamFlow v1 sebelumnya.</p>
+              <p class="text-gray-300 mt-1 text-sm">Di StreamFlow v2, proses streaming sudah dioptimalkan, sehingga jauh
+                lebih ringan dibandingkan StreamFlow v1 sebelumnya.</p>
             </div>
           </div>
-          
+
           <div class="flex items-start gap-3">
             <div class="shrink-0">
               <div class="w-8 h-8 bg-purple-500/20 rounded-full flex items-center justify-center">
@@ -330,10 +323,11 @@
             </div>
             <div>
               <h4 class="font-medium text-white text-sm">Penjadwalan Live Streaming</h4>
-              <p class="text-gray-300 mt-1 text-sm">Di versi baru ini, fitur penjadwalan streaming ataupun auto stop sudah ditambahkan dan diperbaiki dibanding versi sebelumnya.</p>
+              <p class="text-gray-300 mt-1 text-sm">Di versi baru ini, fitur penjadwalan streaming ataupun auto stop
+                sudah ditambahkan dan diperbaiki dibanding versi sebelumnya.</p>
             </div>
           </div>
-          
+
           <div class="flex items-start gap-3">
             <div class="shrink-0">
               <div class="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center">
@@ -342,7 +336,8 @@
             </div>
             <div>
               <h4 class="font-medium text-white text-sm">Fix Bug</h4>
-              <p class="text-gray-300 mt-1 text-sm">Beberapa bug yang sering ditemui di versi sebelumnya sudah di fix pada StreamFlow v2 ini, salah satunya bug streaming tiba-tiba terhenti.</p>
+              <p class="text-gray-300 mt-1 text-sm">Beberapa bug yang sering ditemui di versi sebelumnya sudah di fix
+                pada StreamFlow v2 ini, salah satunya bug streaming tiba-tiba terhenti.</p>
             </div>
           </div>
         </div>
@@ -350,27 +345,34 @@
     </div>
   </div>
 </body>
+
 </html>
 <style>
-  #server-clock, #mobile-server-clock {
+  #server-clock,
+  #mobile-server-clock {
     font-variant-numeric: tabular-nums;
   }
+
   @media (min-width: 550px) {
     #mobile-server-time {
       display: flex !important;
     }
+
     #mobile-separator {
       display: block !important;
     }
   }
+
   @media (min-width: 1024px) {
     #mobile-server-time {
       display: none !important;
     }
+
     #mobile-separator {
       display: none !important;
     }
   }
+
   #profile-dropdown {
     position: fixed;
     z-index: 100;
@@ -385,6 +387,7 @@
     bottom: 80px;
     left: 15px;
   }
+
   #profile-dropdown.hidden {
     opacity: 0;
     transform: translateY(10px);
@@ -392,6 +395,7 @@
     display: block !important;
     visibility: hidden;
   }
+
   @media (max-width: 768px) {
     #profile-dropdown {
       min-width: 200px;
@@ -401,12 +405,15 @@
       top: 100px;
     }
   }
+
   .text-logout {
     color: #FF5555;
   }
+
   .text-logout:hover {
     color: #FF7777;
   }
+
   .saweria-button {
     position: relative;
     border-radius: 6px;
@@ -415,14 +422,17 @@
     box-shadow: 3px 3px 0px #000000;
     transition: all 0.2s ease;
   }
+
   .saweria-button:hover {
     transform: translate(1px, 1px);
     box-shadow: 1px 1px 0px #000000;
   }
+
   .saweria-button:active {
     transform: translate(2px, 2px);
     box-shadow: 0px 0px 0px #000000;
   }
+
   .saweria-tooltip {
     position: absolute;
     bottom: 100%;
@@ -435,11 +445,13 @@
     z-index: 50;
     filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.2));
   }
+
   .saweria-button:hover .saweria-tooltip {
     opacity: 1;
     visibility: visible;
     transform: translateY(0);
   }
+
   .tooltip-arrow {
     position: absolute;
     bottom: -6px;
@@ -449,11 +461,13 @@
     background-color: white;
     transform: rotate(45deg);
   }
+
   @media (max-width: 1023px) {
     body {
       padding-top: 16px;
     }
   }
+
   .bottom-nav-item {
     display: flex;
     flex-direction: column;
@@ -466,19 +480,24 @@
     position: relative;
     transition: color 0.2s ease;
   }
+
   .bottom-nav-item i {
     font-size: 22px;
     margin-bottom: 4px;
   }
+
   .bottom-nav-item span {
     font-size: 11px;
   }
+
   .bottom-nav-item:hover {
     color: #E5E5E5;
   }
+
   .bottom-nav-active {
     color: #0055FF;
   }
+
   .bottom-nav-active::before {
     content: '';
     position: absolute;
@@ -490,27 +509,32 @@
     background-color: #0055FF;
     border-radius: 0 0 4px 4px;
   }
+
   @media (max-width: 1023px) {
     .min-h-screen {
       padding-bottom: 80px !important;
     }
+
     #mobile-profile-popup.show {
       opacity: 1;
       transform: translateY(0);
       visibility: visible;
     }
   }
+
   #mobile-notification-popup.show {
     opacity: 1 !important;
     transform: translateY(0) !important;
     visibility: visible !important;
   }
+
   #mobile-notification-popup {
     z-index: 100;
     transition: opacity 0.3s, transform 0.3s, visibility 0.3s;
     display: block !important;
     visibility: hidden;
   }
+
   #mobile-notification-popup.hidden {
     display: none !important;
   }
@@ -571,9 +595,9 @@
       mobileNotificationBtn.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        
+
         hideNotificationBadge();
-        
+
         const btnRect = mobileNotificationBtn.getBoundingClientRect();
         mobileNotificationPopup.style.top = '64px';
         mobileNotificationPopup.style.right = '10px';
@@ -609,16 +633,16 @@
       notificationBtn.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        
+
         hideNotificationBadge();
-        
+
         if (notificationDropdown.classList.contains('hidden')) {
           notificationDropdown.classList.remove('hidden');
         } else {
           notificationDropdown.classList.add('hidden');
         }
       });
-      
+
       document.addEventListener('click', function (e) {
         if (!notificationDropdown.classList.contains('hidden') &&
           !notificationBtn.contains(e.target) &&
@@ -636,10 +660,10 @@
   function hideNotificationBadge() {
     const badge = document.querySelector('#notification-btn .bg-red-500');
     const mobileBadge = document.querySelector('#mobile-notification-btn .bg-red-500');
-    
+
     if (badge) badge.classList.add('hidden');
     if (mobileBadge) mobileBadge.classList.add('hidden');
-    
+
     const latestCommitSha = localStorage.getItem('latestCommitSha');
     if (latestCommitSha) {
       localStorage.setItem('savedCommitSha', latestCommitSha);
@@ -648,21 +672,21 @@
 
   async function checkGitHubUpdates() {
     try {
-      const response = await fetch('https://api.github.com/repos/bangtutorial/streamflow/commits?per_page=3');
+      const response = await fetch('https://api.github.com/repos/cakapbagus/streamflow/commits?per_page=3');
       if (!response.ok) {
         return;
       }
-      
+
       const commits = await response.json();
-      
+
       if (commits && commits.length > 0) {
         const latestCommitSha = commits[0].sha;
         const savedCommitSha = localStorage.getItem('savedCommitSha');
-        
+
         localStorage.setItem('latestCommitSha', latestCommitSha);
-        
+
         showGitHubUpdateNotifications(commits);
-        
+
         if (!savedCommitSha) {
           localStorage.setItem('savedCommitSha', latestCommitSha);
         } else if (savedCommitSha !== latestCommitSha) {
@@ -681,7 +705,7 @@
   function showNotificationBadge() {
     const badge = document.querySelector('#notification-btn .bg-red-500');
     const mobileBadge = document.querySelector('#mobile-notification-btn .bg-red-500');
-    
+
     if (badge) badge.classList.remove('hidden');
     if (mobileBadge) mobileBadge.classList.remove('hidden');
   }
@@ -689,7 +713,7 @@
   function showGitHubUpdateNotifications(commits) {
     const notificationList = document.getElementById('notification-list');
     const mobileNotificationList = document.getElementById('mobile-notification-list');
-    
+
     if (notificationList) {
       const existingNotifications = notificationList.querySelectorAll('[data-github-notification]');
       existingNotifications.forEach(notification => notification.remove());
@@ -698,13 +722,13 @@
       const existingNotifications = mobileNotificationList.querySelectorAll('[data-github-notification]');
       existingNotifications.forEach(notification => notification.remove());
     }
-    
+
     commits.forEach(commit => {
       const timeAgo = getTimeAgo(commit.commit.author.date);
       const commitMessage = commit.commit.message.split('\n')[0];
       const shortSha = commit.sha.substring(0, 7);
       const authorName = commit.commit.author.name;
-      
+
       const notificationHTML = `
         <div class="p-3 hover:bg-gray-700/50 transition-colors cursor-pointer" data-github-notification onclick="window.open('${commit.html_url}', '_blank')">
           <div class="flex items-start gap-3">
@@ -719,7 +743,7 @@
           </div>
         </div>
       `;
-      
+
       if (notificationList) {
         notificationList.insertAdjacentHTML('beforeend', notificationHTML);
       }
@@ -727,7 +751,7 @@
         mobileNotificationList.insertAdjacentHTML('beforeend', notificationHTML);
       }
     });
-    
+
     updateNotificationBadge();
   }
 
@@ -735,7 +759,7 @@
     const now = new Date();
     const date = new Date(dateString);
     const diffInSeconds = Math.floor((now - date) / 1000);
-    
+
     if (diffInSeconds < 60) {
       return 'Just now';
     } else if (diffInSeconds < 3600) {
@@ -765,7 +789,7 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', function () {
     loadNotifications();
     initServerTime();
   });
@@ -849,7 +873,7 @@
 
   document.addEventListener('click', (e) => {
     const updateModal = document.getElementById('streamflowUpdateModal');
-    if (updateModal && e.target === updateModal) { 
+    if (updateModal && e.target === updateModal) {
       closeStreamflowUpdateModal();
     }
   });

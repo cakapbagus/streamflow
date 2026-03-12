@@ -34,7 +34,7 @@ Terima kasih sudah tertarik untuk berkontribusi ke projek StreamFlow
 
 ## Pertanyaan?
 
-Jika ada pertanyaan, silakan buka [Issue](https://github.com/bangtutorial/streamflow/issues) baru.
+Jika ada pertanyaan, silakan buka [Issue](https://github.com/cakapbagus/streamflow/issues) baru.
 
 ---
 Terima kasih atas kontribusinya! 🙏
