@@ -5,6 +5,11 @@
       <p class="text-gray-400 text-sm mt-1">View and manage your past streams</p>
     </div>
     <div class="flex flex-wrap items-center gap-3">
+      <button id="delete-selected-btn" onclick="deleteSelected()"
+        class="hidden items-center gap-1.5 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-400 rounded-lg text-sm transition-all duration-200">
+        <i class="ti ti-trash"></i>
+        <span>Delete Selected (<span id="selected-count">0</span>)</span>
+      </button>
       <div class="relative flex-1 md:flex-none md:w-64">
         <input type="text" id="history-search" placeholder="Search history..."
           value="<%= pagination.search || '' %>"
@@ -38,18 +43,23 @@
       <table class="min-w-full divide-y divide-gray-700">
         <thead>
           <tr class="bg-dark-700">
+            <th scope="col" class="px-4 py-3 w-10">
+              <input type="checkbox" id="select-all" class="w-4 h-4 rounded border-gray-600 bg-dark-700 text-primary cursor-pointer accent-primary">
+            </th>
             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Stream Name</th>
             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Platform</th>
             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Start Time</th>
             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Stop Time</th>
             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Duration</th>
-            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
           </tr>
         </thead>
         <tbody id="history-table-body" class="bg-gray-800 divide-y divide-gray-700">
           <% if (history && history.length > 0) { %>
             <% history.forEach(function(entry) { %>
               <tr class="hover:bg-dark-700/50 transition-colors" data-id="<%= entry.id %>" data-platform="<%= entry.platform %>" data-title="<%= entry.title %>">
+                <td class="px-4 py-4 w-10">
+                  <input type="checkbox" class="row-checkbox w-4 h-4 rounded border-gray-600 bg-dark-700 cursor-pointer accent-primary" value="<%= entry.id %>">
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
                     <div class="w-10 h-6 bg-dark-700 rounded flex-shrink-0 overflow-hidden mr-3">
@@ -73,11 +83,6 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400"><%= helpers.formatDateTime(entry.start_time) %></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400"><%= helpers.formatDateTime(entry.end_time) %></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm"><%= helpers.formatDuration(entry.duration) %></td>
-                <td class="px-6 py-4 whitespace-nowrap text-right">
-                  <button onclick="deleteHistoryEntry('<%= entry.id %>', '<%= entry.title %>')" class="p-1.5 text-gray-400 hover:text-red-400 transition-colors">
-                    <i class="ti ti-trash"></i>
-                  </button>
-                </td>
               </tr>
             <% }); %>
           <% } else { %>
@@ -196,38 +201,84 @@
       });
     }
 
-    function deleteHistoryEntry(id, title) {
-      if (confirm(`Are you sure you want to delete "${title}"?`)) {
-        fetch(`/api/history/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } })
-          .then(r => r.json())
-          .then(data => {
-            if (data.success) {
-              showToast('Deleted successfully');
-              const row = document.querySelector(`tr[data-id="${id}"]`);
-              if (row) {
-                row.style.opacity = '0';
-                row.style.transform = 'translateX(-10px)';
-                row.style.transition = 'all 0.3s';
-                setTimeout(() => {
-                  row.remove();
-                  if (!document.querySelector('#history-table-body tr[data-id]')) {
-                    document.getElementById('history-table-body').innerHTML = `
-                      <tr><td colspan="6" class="px-6 py-10 text-center text-gray-400">
-                        <div class="flex flex-col items-center">
-                          <i class="ti ti-history text-3xl mb-2"></i>
-                          <p>No stream history found</p>
-                        </div>
-                      </td></tr>`;
-                  }
-                }, 300);
-              }
-            } else {
-              showToast('Error: ' + (data.error || 'Failed to delete'));
-            }
-          })
-          .catch(() => showToast('Error deleting entry'));
+    // --- Checkbox logic ---
+    function updateSelectionUI() {
+      const checkboxes = document.querySelectorAll('.row-checkbox');
+      const checked = document.querySelectorAll('.row-checkbox:checked');
+      const btn = document.getElementById('delete-selected-btn');
+      const countEl = document.getElementById('selected-count');
+      const selectAll = document.getElementById('select-all');
+
+      countEl.textContent = checked.length;
+      if (checked.length > 0) {
+        btn.classList.remove('hidden');
+        btn.classList.add('flex');
+      } else {
+        btn.classList.add('hidden');
+        btn.classList.remove('flex');
+      }
+      selectAll.indeterminate = checked.length > 0 && checked.length < checkboxes.length;
+      selectAll.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
+    }
+
+    document.getElementById('select-all').addEventListener('change', function() {
+      document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = this.checked);
+      updateSelectionUI();
+    });
+
+    document.getElementById('history-table-body').addEventListener('change', function(e) {
+      if (e.target.classList.contains('row-checkbox')) updateSelectionUI();
+    });
+
+    function removeRowAnimated(row, onDone) {
+      row.style.opacity = '0';
+      row.style.transform = 'translateX(-10px)';
+      row.style.transition = 'all 0.3s';
+      setTimeout(() => { row.remove(); if (onDone) onDone(); }, 300);
+    }
+
+    function checkEmptyTable() {
+      if (!document.querySelector('#history-table-body tr[data-id]')) {
+        document.getElementById('history-table-body').innerHTML = `
+          <tr><td colspan="6" class="px-6 py-10 text-center text-gray-400">
+            <div class="flex flex-col items-center">
+              <i class="ti ti-history text-3xl mb-2"></i>
+              <p>No stream history found</p>
+            </div>
+          </td></tr>`;
       }
     }
+
+    async function deleteSelected() {
+      const checked = document.querySelectorAll('.row-checkbox:checked');
+      if (!checked.length) return;
+      const ids = Array.from(checked).map(cb => cb.value);
+      if (!confirm(`Delete ${ids.length} selected entr${ids.length > 1 ? 'ies' : 'y'}?`)) return;
+
+      let successCount = 0;
+      const rows = ids.map(id => document.querySelector(`tr[data-id="${id}"]`)).filter(Boolean);
+
+      for (const id of ids) {
+        try {
+          const r = await fetch(`/api/history/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+          const data = await r.json();
+          if (data.success) {
+            successCount++;
+            const row = document.querySelector(`tr[data-id="${id}"]`);
+            if (row) removeRowAnimated(row);
+          }
+        } catch (e) { /* skip */ }
+      }
+
+      setTimeout(() => {
+        checkEmptyTable();
+        updateSelectionUI();
+      }, 400);
+
+      if (successCount > 0) showToast(`Deleted ${successCount} entr${successCount > 1 ? 'ies' : 'y'}`);
+    }
+
+
 
     function showToast(message) {
       const toast = document.createElement('div');

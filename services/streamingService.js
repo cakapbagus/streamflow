@@ -81,6 +81,19 @@ function getRetryDelay(retryCount) {
   return delay + Math.random() * 1000;
 }
 
+function buildOverlayFilter(overlay) {
+  if (!overlay || !overlay.enabled || !overlay.image_path) return null;
+
+  const opacity = Math.min(1, Math.max(0, overlay.opacity ?? 1));
+  const x = overlay.position_x ?? 10;
+  const y = overlay.position_y ?? 10;
+  const w = overlay.width ?? 150;
+  const h = overlay.height ?? 150;
+
+  // FFmpeg overlay filter: scale logo → atur opacity → overlay ke posisi
+  return `movie='${overlay.image_path.replace(/\\/g, '/')}',scale=${w}:${h},format=rgba,colorchannelmixer=aa=${opacity}[logo];[in][logo]overlay=${x}:${y}[out]`;
+}
+
 async function buildFFmpegArgsForPlaylist(stream, playlist) {
   if (!playlist.videos || playlist.videos.length === 0) {
     throw new Error('Playlist is empty');
@@ -94,9 +107,43 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
     fs.mkdirSync(tempDir, { recursive: true });
   }
 
-  let videoPaths = [];
   const videos = playlist.is_shuffle ? shuffleArray(playlist.videos) : playlist.videos;
+  const hasAudioBg = playlist.audios && playlist.audios.length > 0;
 
+  const resolution = stream.use_advanced_settings ? (stream.resolution || '1280x720') : '1280x720';
+  const bitrate = stream.use_advanced_settings ? (stream.bitrate || 2500) : 2500;
+  const fps = stream.use_advanced_settings ? (stream.fps || 30) : 30;
+
+  // ─── SEQUENTIAL MODE (tanpa background audio) ────────────────────────────
+  // Setiap video di-treat seperti single file (buildFFmpegArgs satuan),
+  // dijalankan satu per satu dalam loop di startStream.
+  // Ini menghindari masalah resolusi/audio-track mismatch pada ffmpeg concat.
+  if (!hasAudioBg) {
+    let videoPaths = [];
+    for (const video of videos) {
+      const relPath = video.filepath.startsWith('/') ? video.filepath.substring(1) : video.filepath;
+      const fullPath = path.join(projectRoot, 'public', relPath);
+      if (!fs.existsSync(fullPath)) {
+        throw new Error(`Video file not found: ${fullPath}`);
+      }
+      videoPaths.push(fullPath);
+    }
+
+    // Return sequential descriptor — ditangani oleh startStream bukan spawn langsung
+    return {
+      __sequentialPlaylist: true,
+      videoPaths,
+      loop: !!stream.loop_video,
+      rtmpUrl,
+      resolution,
+      bitrate,
+      fps,
+    };
+  }
+
+  // WITH BACKGROUND AUDIO
+  // Build video concat file (hanya dipakai untuk mode hasAudioBg)
+  let videoPaths = [];
   for (const video of videos) {
     const relPath = video.filepath.startsWith('/') ? video.filepath.substring(1) : video.filepath;
     const fullPath = path.join(projectRoot, 'public', relPath);
@@ -107,9 +154,8 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
   }
 
   const concatFile = path.join(tempDir, `playlist_${stream.id}.txt`);
-  let content = '';
   const loopCount = stream.loop_video ? 10000 : 1;
-
+  let content = '';
   for (let i = 0; i < loopCount; i++) {
     for (const vp of videoPaths) {
       content += `file '${vp.replace(/\\/g, '/')}'\n`;
@@ -120,84 +166,6 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
   } catch (err) {
     if (err.code === 'ENOSPC') throw new Error('ENOSPC: Server disk is full. Cannot write playlist file.');
     throw err;
-  }
-
-  const hasAudio = playlist.audios && playlist.audios.length > 0;
-
-  if (!hasAudio) {
-    if (!stream.use_advanced_settings) {
-      // Simple mode: force re-encode ke 1280x720 @ 30fps agar semua video
-      // di playlist (resolusi/fps berbeda) bisa digabung tanpa glitch.
-      return [
-        '-nostdin',
-        '-loglevel', 'warning',
-        '-stats',
-        '-re',
-        '-fflags', '+genpts+igndts+discardcorrupt',
-        '-avoid_negative_ts', 'make_zero',
-        '-f', 'concat',
-        '-safe', '0',
-        '-i', concatFile,
-        '-c:v', 'libx264',
-        '-preset', 'veryfast',
-        '-tune', 'zerolatency',
-        '-profile:v', 'high',
-        '-level', '4.1',
-        '-b:v', '2500k',
-        '-maxrate', '2750k',
-        '-bufsize', '5000k',
-        '-pix_fmt', 'yuv420p',
-        '-vf', 'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2',
-        '-r', '30',
-        '-g', '60',
-        '-keyint_min', '30',
-        '-sc_threshold', '0',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        '-ar', '44100',
-        '-ac', '2',
-        '-f', 'flv',
-        '-flvflags', 'no_duration_filesize',
-        rtmpUrl
-      ];
-    }
-
-    const resolution = stream.resolution || '1280x720';
-    const bitrate = stream.bitrate || 2500;
-    const fps = stream.fps || 30;
-
-    return [
-      '-nostdin',
-      '-loglevel', 'warning',
-      '-stats',
-      '-re',
-      '-fflags', '+genpts+igndts+discardcorrupt',
-      '-avoid_negative_ts', 'make_zero',
-      '-f', 'concat',
-      '-safe', '0',
-      '-i', concatFile,
-      '-c:v', 'libx264',
-      '-preset', 'veryfast',
-      '-tune', 'zerolatency',
-      '-profile:v', 'high',
-      '-level', '4.1',
-      '-b:v', `${bitrate}k`,
-      '-maxrate', `${Math.round(bitrate * 1.1)}k`,
-      '-bufsize', `${bitrate * 2}k`,
-      '-pix_fmt', 'yuv420p',
-      '-g', String(fps * 2),
-      '-keyint_min', String(fps),
-      '-sc_threshold', '0',
-      '-s', resolution,
-      '-r', String(fps),
-      '-c:a', 'aac',
-      '-b:a', '128k',
-      '-ar', '44100',
-      '-ac', '2',
-      '-f', 'flv',
-      '-flvflags', 'no_duration_filesize',
-      rtmpUrl
-    ];
   }
 
   let audioPaths = [];
@@ -226,51 +194,13 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
     throw err;
   }
 
-  if (!stream.use_advanced_settings) {
-    // Simple mode with custom audio: force re-encode video ke 1280x720 @ 30fps,
-    // replace audio stream dengan audio playlist.
-    return [
-      '-nostdin',
-      '-loglevel', 'warning',
-      '-stats',
-      '-re',
-      '-fflags', '+genpts+igndts+discardcorrupt',
-      '-avoid_negative_ts', 'make_zero',
-      '-f', 'concat',
-      '-safe', '0',
-      '-i', concatFile,
-      '-f', 'concat',
-      '-safe', '0',
-      '-i', audioConcatFile,
-      '-map', '0:v:0',
-      '-map', '1:a:0',
-      '-c:v', 'libx264',
-      '-preset', 'veryfast',
-      '-tune', 'zerolatency',
-      '-profile:v', 'high',
-      '-level', '4.1',
-      '-b:v', '2500k',
-      '-maxrate', '2750k',
-      '-bufsize', '5000k',
-      '-pix_fmt', 'yuv420p',
-      '-vf', 'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2',
-      '-r', '30',
-      '-g', '60',
-      '-keyint_min', '30',
-      '-sc_threshold', '0',
-      '-c:a', 'aac',
-      '-b:a', '128k',
-      '-ar', '44100',
-      '-ac', '2',
-      '-f', 'flv',
-      '-flvflags', 'no_duration_filesize',
-      rtmpUrl
-    ];
-  }
+  const overlay = getOverlaySettings(stream.user_id);
+  const overlayFilter = buildOverlayFilter(overlay);
 
-  const resolution = stream.resolution || '1280x720';
-  const bitrate = stream.bitrate || 2500;
-  const fps = stream.fps || 30;
+  const [width, height] = resolution.split('x');
+  const vfFilter = overlayFilter
+    ? `fps=${fps},scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,${overlayFilter}`  // scale dulu, baru overlay
+    : `fps=${fps},scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
 
   return [
     '-nostdin',
@@ -278,6 +208,8 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
     '-stats',
     '-re',
     '-fflags', '+genpts+igndts+discardcorrupt',
+    '-vsync', 'cfr',          // ← tambahkan ini: paksa constant frame rate
+    '-async', '1',            // ← sinkronisasi audio ke video
     '-avoid_negative_ts', 'make_zero',
     '-f', 'concat',
     '-safe', '0',
@@ -293,126 +225,76 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
     '-profile:v', 'high',
     '-level', '4.1',
     '-b:v', `${bitrate}k`,
-    '-maxrate', `${Math.round(bitrate * 1.1)}k`,
+    '-maxrate', `${Math.round(bitrate * 1.5)}k`,
     '-bufsize', `${bitrate * 2}k`,
     '-pix_fmt', 'yuv420p',
     '-g', String(fps * 2),
-    '-keyint_min', String(fps),
+    '-keyint_min', String(fps * 2),
     '-sc_threshold', '0',
-    '-s', resolution,
+    '-vf', vfFilter,
     '-r', String(fps),
     '-c:a', 'aac',
     '-b:a', '128k',
     '-ar', '44100',
     '-ac', '2',
+    '-af', 'aresample=async=1:first_pts=0',
+    '-shortest',
     '-f', 'flv',
     '-flvflags', 'no_duration_filesize',
     rtmpUrl
   ];
 }
 
-function buildOverlayFilter(overlay) {
-  if (!overlay || !overlay.enabled || !overlay.image_path) return null;
+/**
+ * Build FFmpeg args untuk satu video dalam sequential playlist.
+ * Tidak pakai -stream_loop karena loop dihandle di level sequencer.
+ * Video di-normalize ke resolusi/fps/bitrate target agar output stream konsisten.
+ */
+function buildFFmpegArgsForSingleVideoInPlaylist(stream, videoPath, { rtmpUrl, resolution, bitrate, fps }) {
+  const overlay = getOverlaySettings(stream.user_id);
+  const overlayFilter = buildOverlayFilter(overlay);
 
-  const opacity = Math.min(1, Math.max(0, overlay.opacity ?? 1));
-  const x = overlay.position_x ?? 10;
-  const y = overlay.position_y ?? 10;
-  const w = overlay.width ?? 150;
-  const h = overlay.height ?? 150;
+  const [width, height] = resolution.split('x');
 
-  // FFmpeg overlay filter: scale logo → atur opacity → overlay ke posisi
-  return `movie='${overlay.image_path.replace(/\\/g, '/')}',scale=${w}:${h},format=rgba,colorchannelmixer=aa=${opacity}[logo];[in][logo]overlay=${x}:${y}[out]`;
+  // Gunakan scale+pad agar video dengan rasio berbeda tetap fit tanpa crop
+  const vfFilter = overlayFilter
+    ? `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,${overlayFilter}`  // scale dulu, baru overlay
+    : `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+
+  return [
+    '-nostdin',
+    '-loglevel', 'warning',
+    '-stats',
+    '-re',
+    '-fflags', '+genpts+igndts+discardcorrupt',
+    '-avoid_negative_ts', 'make_zero',
+    '-i', videoPath,
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-tune', 'zerolatency',
+    '-profile:v', 'high',
+    '-level', '4.1',
+    '-b:v', `${bitrate}k`,
+    '-maxrate', `${Math.round(bitrate * 1.5)}k`,
+    '-bufsize', `${bitrate * 2}k`,
+    '-pix_fmt', 'yuv420p',
+    '-g', String(fps * 2),
+    '-keyint_min', String(fps),
+    '-sc_threshold', '0',
+    '-vf', vfFilter,
+    '-r', String(fps),
+    // Audio: gunakan stream audio jika ada, fallback generate silence jika tidak ada
+    '-c:a', 'aac',
+    '-b:a', '128k',
+    '-ar', '44100',
+    '-ac', '2',
+    '-af', 'aresample=async=1:first_pts=0',
+    '-f', 'flv',
+    '-flvflags', 'no_duration_filesize',
+    rtmpUrl
+  ];
 }
 
-// async function buildFFmpegArgs(stream) {
-//   const streamWithVideo = await Stream.getStreamWithVideo(stream.id);
-
-//   if (streamWithVideo && streamWithVideo.video_type === 'playlist') {
-//     const playlist = await Playlist.findByIdWithVideos(stream.video_id);
-//     if (!playlist) {
-//       throw new Error('Playlist not found');
-//     }
-//     return await buildFFmpegArgsForPlaylist(stream, playlist);
-//   }
-
-//   const video = await Video.findById(stream.video_id);
-//   if (!video) {
-//     throw new Error('Video not found');
-//   }
-
-//   const relPath = video.filepath.startsWith('/') ? video.filepath.substring(1) : video.filepath;
-//   const projectRoot = path.resolve(__dirname, '..');
-//   const videoPath = path.join(projectRoot, 'public', relPath);
-
-//   if (!fs.existsSync(videoPath)) {
-//     throw new Error(`Video file not found: ${videoPath}`);
-//   }
-
-//   const rtmpUrl = `${stream.rtmp_url.replace(/\/$/, '')}/${stream.stream_key}`;
-//   const loopValue = stream.loop_video ? '-1' : '0';
-
-//   const overlay = getOverlaySettings(userId);
-//   const overlayFilter = buildOverlayFilter(overlay);
-
-//   const vfFilter = overlayFilter
-//   ? `scale=${width}:${height},${overlayFilter}`  // gabungkan dengan filter yang ada
-//   : `scale=${width}:${height}`;
-
-//   if (!stream.use_advanced_settings) {
-//     return [
-//       '-nostdin',
-//       '-loglevel', 'warning',
-//       '-stats',
-//       '-re',
-//       '-fflags', '+genpts+igndts+discardcorrupt',
-//       '-avoid_negative_ts', 'make_zero',
-//       '-stream_loop', loopValue,
-//       '-i', videoPath,
-//       '-c:v', 'copy',
-//       '-c:a', 'copy',
-//       '-bsf:a', 'aac_adtstoasc',
-//       '-f', 'flv', vfFilter,
-//       '-flvflags', 'no_duration_filesize',
-//       rtmpUrl
-//     ];
-//   }
-
-//   const resolution = stream.resolution || '1280x720';
-//   const bitrate = stream.bitrate || 2500;
-//   const fps = stream.fps || 30;
-
-//   return [
-//     '-nostdin',
-//     '-loglevel', 'warning',
-//     '-stats',
-//     '-re',
-//     '-fflags', '+genpts+igndts+discardcorrupt',
-//     '-avoid_negative_ts', 'make_zero',
-//     '-stream_loop', loopValue,
-//     '-i', videoPath,
-//     '-c:v', 'libx264',
-//     '-preset', 'veryfast',
-//     '-tune', 'zerolatency',
-//     '-profile:v', 'high',
-//     '-level', '4.1',
-//     '-b:v', `${bitrate}k`,
-//     '-maxrate', `${Math.round(bitrate * 1.1)}k`,
-//     '-bufsize', `${bitrate * 2}k`,
-//     '-pix_fmt', 'yuv420p',
-//     '-g', String(fps * 2),
-//     '-keyint_min', String(fps),
-//     '-sc_threshold', '0',
-//     '-s', resolution,
-//     '-r', String(fps),
-//     '-c:a', 'aac',
-//     '-b:a', '128k',
-//     '-ar', '44100',
-//     '-ac', '2',
-//     '-f', 'flv', vfFilter,
-//     '-flvflags', 'no_duration_filesize',
-//     rtmpUrl
-//   ];
-// }
 async function buildFFmpegArgs(stream) {
   const streamWithVideo = await Stream.getStreamWithVideo(stream.id);
 
@@ -440,63 +322,17 @@ async function buildFFmpegArgs(stream) {
   const rtmpUrl = `${stream.rtmp_url.replace(/\/$/, '')}/${stream.stream_key}`;
   const loopValue = stream.loop_video ? '-1' : '0';
 
-  // FIX 1: gunakan stream.user_id bukan userId
   const overlay = getOverlaySettings(stream.user_id);
   const overlayFilter = buildOverlayFilter(overlay);
 
-  if (!stream.use_advanced_settings) {
-    // FIX 2: branch copy — jika ada overlay, terpaksa re-encode video
-    if (overlayFilter) {
-      return [
-        '-nostdin',
-        '-loglevel', 'warning',
-        '-stats',
-        '-re',
-        '-fflags', '+genpts+igndts+discardcorrupt',
-        '-avoid_negative_ts', 'make_zero',
-        '-stream_loop', loopValue,
-        '-i', videoPath,
-        '-vf', overlayFilter,       // FIX 3: -vf sebagai flag tersendiri
-        '-c:v', 'libx264',
-        '-preset', 'veryfast',
-        '-tune', 'zerolatency',
-        '-pix_fmt', 'yuv420p',
-        '-c:a', 'copy',
-        '-bsf:a', 'aac_adtstoasc',
-        '-f', 'flv',
-        '-flvflags', 'no_duration_filesize',
-        rtmpUrl
-      ];
-    }
+  const resolution = stream.use_advanced_settings ? (stream.resolution || '1280x720') : '1280x720';
+  const bitrate = stream.use_advanced_settings ? (stream.bitrate || 2500) : 2500;
+  const fps = stream.use_advanced_settings ? (stream.fps || 30) : 30;
 
-    return [
-      '-nostdin',
-      '-loglevel', 'warning',
-      '-stats',
-      '-re',
-      '-fflags', '+genpts+igndts+discardcorrupt',
-      '-avoid_negative_ts', 'make_zero',
-      '-stream_loop', loopValue,
-      '-i', videoPath,
-      '-c:v', 'copy',
-      '-c:a', 'copy',
-      '-bsf:a', 'aac_adtstoasc',
-      '-f', 'flv',
-      '-flvflags', 'no_duration_filesize',
-      rtmpUrl
-    ];
-  }
-
-  const resolution = stream.resolution || '1280x720';
-  const bitrate = stream.bitrate || 2500;
-  const fps = stream.fps || 30;
-
-  // FIX 4: gunakan resolution dari stream, bukan variabel width/height yang tidak ada
   const [width, height] = resolution.split('x');
-  const scaleFilter = `scale=${width}:${height}`;
   const vfFilter = overlayFilter
-    ? `${scaleFilter},${overlayFilter}`
-    : scaleFilter;
+    ? `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,${overlayFilter}`  // scale dulu, baru overlay
+    : `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
 
   return [
     '-nostdin',
@@ -513,19 +349,19 @@ async function buildFFmpegArgs(stream) {
     '-profile:v', 'high',
     '-level', '4.1',
     '-b:v', `${bitrate}k`,
-    '-maxrate', `${Math.round(bitrate * 1.1)}k`,
+    '-maxrate', `${Math.round(bitrate * 1.5)}k`,
     '-bufsize', `${bitrate * 2}k`,
     '-pix_fmt', 'yuv420p',
     '-g', String(fps * 2),
-    '-keyint_min', String(fps),
+    '-keyint_min', String(fps * 2),
     '-sc_threshold', '0',
-    '-s', resolution,
+    '-vf', vfFilter,
     '-r', String(fps),
-    '-vf', vfFilter,                // FIX 3: posisi benar sebagai flag tersendiri
     '-c:a', 'aac',
     '-b:a', '128k',
     '-ar', '44100',
     '-ac', '2',
+    '-af', 'aresample=async=1:first_pts=0',
     '-f', 'flv',
     '-flvflags', 'no_duration_filesize',
     rtmpUrl
@@ -573,6 +409,218 @@ async function killFFmpegProcess(streamId, streamData) {
 
     setTimeout(cleanup, 5000);
   });
+}
+
+/**
+ * Sequential playlist runner — digunakan ketika playlist tidak punya background audio.
+ * Setiap video dijalankan seperti single file (bukan ffmpeg concat), satu per satu.
+ * Loop seluruh playlist didukung via `config.loop` (10000 iterasi = effectively infinite).
+ *
+ * Lifecycle: fungsi ini langsung return { success: true } setelah video pertama mulai.
+ * Transisi antar video dihandle secara async di dalam runner itu sendiri.
+ * activeStreams selalu diisi dengan proses ffmpeg yang sedang berjalan saat ini.
+ */
+async function startSequentialPlaylist(streamId, stream, config, { isRetry, originalStartTime, originalEndTime, baseUrl }) {
+  const { videoPaths, loop, rtmpUrl, resolution, bitrate, fps } = config;
+  const totalVideos = videoPaths.length;
+  const maxRounds = loop ? 10000 : 1;
+
+  let startTimeIso;
+  if (isRetry && originalStartTime) {
+    startTimeIso = originalStartTime;
+  } else {
+    startTimeIso = new Date().toISOString();
+  }
+
+  if (!isRetry) {
+    await Stream.updateStatus(streamId, 'live', stream.user_id, { startTimeOverride: startTimeIso });
+  }
+
+  // Spawn video pertama terlebih dulu secara sinkron agar activeStreams terisi
+  // sebelum return, baru sisanya jalan async
+  const firstArgs = buildFFmpegArgsForSingleVideoInPlaylist(stream, videoPaths[0], { rtmpUrl, resolution, bitrate, fps });
+  addStreamLog(streamId, `[Seq 1/${totalVideos} R1] Playing: ${path.basename(videoPaths[0])}`);
+
+  const firstProc = spawn(ffmpegPath, firstArgs, {
+    detached: false,
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+
+  activeStreams.set(streamId, {
+    process: firstProc,
+    userId: stream.user_id,
+    startTime: startTimeIso,
+    endTime: originalEndTime,
+    pid: firstProc.pid,
+    lastActivity: Date.now()
+  });
+
+  firstProc.stdout.on('data', (data) => {
+    const msg = data.toString().trim();
+    if (msg) { addStreamLog(streamId, `[OUT] ${msg}`); updateStreamActivity(streamId); }
+  });
+  firstProc.stderr.on('data', (data) => {
+    const msg = data.toString().trim();
+    if (msg) {
+      updateStreamActivity(streamId);
+      if (msg.includes('bitrate=') || msg.includes('duplicate_frames')) {
+        addStreamLog(streamId, `[Seq 1/${totalVideos} R1] [Metrics] ${msg}`);
+      } else if (!(msg.includes('frame=') || msg.includes('speed=') || msg.includes('time='))) {
+        addStreamLog(streamId, `[Seq 1/${totalVideos} R1] [FFmpeg] ${msg}`);
+      }
+    }
+  });
+
+  // Setelah video pertama selesai, lanjut via runSequence mulai dari video ke-2
+  firstProc.once('exit', async (code, signal) => {
+    if (manuallyStoppingStreams.has(streamId)) {
+      activeStreams.delete(streamId);
+      manuallyStoppingStreams.delete(streamId);
+      cleanupStreamData(streamId);
+      return;
+    }
+    // Lanjutkan dari video index 1 (atau round berikutnya jika hanya 1 video)
+    const nextIdx = totalVideos > 1 ? 1 : 0;
+    const startRound = totalVideos > 1 ? 0 : 1;
+
+    // Reset retry sementara untuk lanjut dari titik ini
+    const isError = signal === 'SIGSEGV' || signal === 'SIGKILL' || signal === 'SIGPIPE' ||
+      (code !== 0 && code !== null) || (code === null && signal === null);
+    if (!isError) streamRetryCount.set(streamId, 0);
+
+    // Jalankan sisa sequence async
+    const runRemainder = async () => {
+      for (let round = startRound; round < maxRounds; round++) {
+        const startIndex = (round === startRound && totalVideos > 1) ? nextIdx : 0;
+        for (let idx = startIndex; idx < totalVideos; idx++) {
+          if (manuallyStoppingStreams.has(streamId)) {
+            addStreamLog(streamId, `[Seq] Stopped before video ${idx + 1}/${totalVideos}`);
+            activeStreams.delete(streamId);
+            manuallyStoppingStreams.delete(streamId);
+            cleanupStreamData(streamId);
+            return;
+          }
+
+          const videoPath = videoPaths[idx];
+          const label = `[Seq ${idx + 1}/${totalVideos} R${round + 1}]`;
+          addStreamLog(streamId, `${label} Playing: ${path.basename(videoPath)}`);
+
+          const args = buildFFmpegArgsForSingleVideoInPlaylist(stream, videoPath, { rtmpUrl, resolution, bitrate, fps });
+          const proc = spawn(ffmpegPath, args, { detached: false, stdio: ['ignore', 'pipe', 'pipe'] });
+
+          activeStreams.set(streamId, {
+            process: proc,
+            userId: stream.user_id,
+            startTime: startTimeIso,
+            endTime: originalEndTime,
+            pid: proc.pid,
+            lastActivity: Date.now()
+          });
+
+          proc.stdout.on('data', (data) => {
+            const msg = data.toString().trim();
+            if (msg) { addStreamLog(streamId, `[OUT] ${msg}`); updateStreamActivity(streamId); }
+          });
+          proc.stderr.on('data', (data) => {
+            const msg = data.toString().trim();
+            if (msg) {
+              updateStreamActivity(streamId);
+              if (msg.includes('bitrate=') || msg.includes('duplicate_frames')) {
+                addStreamLog(streamId, `${label} [Metrics] ${msg}`);
+              } else if (!(msg.includes('frame=') || msg.includes('speed=') || msg.includes('time='))) {
+                addStreamLog(streamId, `${label} [FFmpeg] ${msg}`);
+              }
+            }
+          });
+
+          const exitResult = await new Promise((resolve) => {
+            proc.once('exit', (c, s) => resolve({ code: c, signal: s }));
+            proc.once('error', (err) => {
+              addStreamLog(streamId, `${label} Process error: ${err.message}`);
+              resolve({ code: 1, signal: null });
+            });
+          });
+
+          if (manuallyStoppingStreams.has(streamId)) {
+            activeStreams.delete(streamId);
+            manuallyStoppingStreams.delete(streamId);
+            cleanupStreamData(streamId);
+            return;
+          }
+
+          const cs = await Stream.findById(streamId);
+          if (cs && cs.end_time) {
+            const et = new Date(cs.end_time);
+            if (et.getTime() <= Date.now()) {
+              addStreamLog(streamId, `${label} Scheduled end time reached.`);
+              activeStreams.delete(streamId);
+              await Stream.updateStatus(streamId, 'offline', cs.user_id);
+              if (schedulerService) schedulerService.handleStreamStopped(streamId);
+              cleanupStreamData(streamId);
+              return;
+            }
+          }
+
+          const errored = exitResult.signal === 'SIGSEGV' || exitResult.signal === 'SIGKILL' ||
+            exitResult.signal === 'SIGPIPE' ||
+            (exitResult.code !== 0 && exitResult.code !== null) ||
+            (exitResult.code === null && exitResult.signal === null);
+
+          if (errored) {
+            addStreamLog(streamId, `${label} Error: code=${exitResult.code}, signal=${exitResult.signal}`);
+            const rc = streamRetryCount.get(streamId) || 0;
+            streamRetryCount.set(streamId, rc + 1);
+            if (rc + 1 >= MAX_RETRY_ATTEMPTS) {
+              addStreamLog(streamId, `[Seq] Max retries reached, stopping.`);
+              activeStreams.delete(streamId);
+              if (cs) {
+                await Stream.updateStatus(streamId, 'offline', cs.user_id);
+                if (schedulerService) schedulerService.handleStreamStopped(streamId);
+              }
+              cleanupStreamData(streamId);
+              return;
+            }
+          } else {
+            streamRetryCount.set(streamId, 0);
+            addStreamLog(streamId, `${label} Finished normally.`);
+          }
+        }
+      }
+
+      addStreamLog(streamId, `[Seq] Playlist completed.`);
+      activeStreams.delete(streamId);
+      const finalStream = await Stream.findById(streamId);
+      if (finalStream) {
+        await Stream.updateStatus(streamId, 'offline', finalStream.user_id);
+        if (schedulerService) schedulerService.handleStreamStopped(streamId);
+      }
+      cleanupStreamData(streamId);
+    };
+
+    runRemainder().catch((err) => {
+      addStreamLog(streamId, `[Seq] Unhandled error in sequence: ${err.message}`);
+    });
+  });
+
+  firstProc.once('error', async (err) => {
+    addStreamLog(streamId, `[Seq 1] Process error: ${err.message}`);
+    activeStreams.delete(streamId);
+    const s = await Stream.findById(streamId);
+    if (s) await Stream.updateStatus(streamId, 'offline', s.user_id);
+    cleanupStreamData(streamId);
+  });
+
+  if (schedulerService && originalEndTime) {
+    if (typeof schedulerService.scheduleStreamTerminationByEndTime === 'function') {
+      schedulerService.scheduleStreamTerminationByEndTime(streamId, originalEndTime, stream.user_id);
+    }
+  }
+
+  return {
+    success: true,
+    message: 'Sequential playlist stream started',
+    isAdvancedMode: stream.use_advanced_settings
+  };
 }
 
 async function startStream(streamId, isRetry = false, baseUrl = null) {
@@ -628,6 +676,19 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
     }
 
     const ffmpegArgs = await buildFFmpegArgs(stream);
+
+    // ─── SEQUENTIAL PLAYLIST MODE ────────────────────────────────────────────
+    // Ketika playlist tidak punya background audio, setiap video dijalankan
+    // satu per satu seperti single file (bukan ffmpeg concat).
+    if (ffmpegArgs && ffmpegArgs.__sequentialPlaylist) {
+      return await startSequentialPlaylist(streamId, stream, ffmpegArgs, {
+        isRetry,
+        originalStartTime,
+        originalEndTime,
+        baseUrl,
+      });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     addStreamLog(streamId, `Starting FFmpeg process`);
 

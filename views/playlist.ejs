@@ -199,7 +199,11 @@
                           </div>
                           <div class="flex-1 min-w-0">
                             <p class="text-sm font-medium text-white truncate"><%= video.title %></p>
-                            <p class="text-xs text-gray-400"><%= video.duration ? Math.floor(video.duration / 60) + ':' + String(Math.floor(video.duration % 60)).padStart(2, '0') : '0:00' %></p>
+                            <!-- add video duration (HH:MM) • video resolution • video fps -->                             
+                            <p class="text-xs text-gray-400"><%= video.duration ? Math.floor(video.duration / 60) + ':' + String(Math.floor(video.duration % 60)).padStart(2, '0') : '0:00' %>
+                            • <%= video.resolution %>
+                            • <%= video.fps + ' fps' %>
+                            </p>
                           </div>
                           <i class="ti ti-plus text-gray-400"></i>
                         </button>
@@ -231,7 +235,11 @@
             </div>
           </div>
 
-          <div id="audiosTab" class="hidden">  
+          <div id="audiosTab" class="hidden">
+            <div id="bgMusicWarningBanner" class="hidden mb-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-lg px-4 py-3 text-sm">
+              <i class="ti ti-alert-triangle flex-shrink-0 mt-0.5"></i>
+              <span><strong>Important:</strong> When background music is selected, all videos in the playlist must have the <strong>same resolution and frame rate (FPS)</strong>. Mismatched videos will cause streaming errors.</span>
+            </div>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
                 <div class="flex items-center justify-between mb-2">
@@ -410,6 +418,16 @@ function updateBadges() {
     audioBadge.classList.add('bg-gray-700', 'text-gray-400');
     audioBadge.classList.remove('bg-primary/20', 'text-primary');
   }
+
+  // Show/hide background music warning banner
+  const bgMusicBanner = document.getElementById('bgMusicWarningBanner');
+  if (bgMusicBanner) {
+    if (selectedAudios.length > 0) {
+      bgMusicBanner.classList.remove('hidden');
+    } else {
+      bgMusicBanner.classList.add('hidden');
+    }
+  }
 }
 
 function openCreatePlaylistModal() {
@@ -530,7 +548,10 @@ function updateAvailableVideosDisplay() {
         </div>
         <div class="flex-1 min-w-0">
           <p class="text-sm font-medium text-white truncate">${video.title}</p>
-          <p class="text-xs text-gray-400">${formatDuration(video.duration)}</p>
+          <p class="text-xs text-gray-400">${formatDuration(video.duration)}
+          • ${video.resolution}
+          • ${video.fps} fps
+          </p>
         </div>
         <i class="ti ti-plus text-gray-400"></i>
       </button>
@@ -642,7 +663,10 @@ function viewPlaylist(playlistId) {
               <img src="${video.thumbnail_path}" alt="${video.title}" class="w-16 h-10 object-cover rounded" onerror="this.src='/images/default-thumbnail.jpg'">
               <div class="flex-1 min-w-0">
                 <p class="font-medium truncate">${video.title}</p>
-                <p class="text-xs text-gray-400">${formatDuration(video.duration)}</p>
+                <p class="text-xs text-gray-400">${formatDuration(video.duration)}
+                • ${video.resolution}
+                • ${video.fps} fps
+                </p>
               </div>
             </div>
           `).join('');
@@ -717,6 +741,24 @@ function submitPlaylist() {
     switchTab('videos');
     return;
   }
+
+  // Validate resolution & FPS consistency when background music is selected
+  if (selectedAudios.length > 0 && selectedVideos.length > 1) {
+    const firstResolution = selectedVideos[0].resolution;
+    const firstFps = selectedVideos[0].fps;
+    const mismatchedVideos = selectedVideos.filter(
+      v => v.resolution !== firstResolution || String(v.fps) !== String(firstFps)
+    );
+    if (mismatchedVideos.length > 0) {
+      showToast(
+        `Resolution/FPS mismatch detected. All videos must have same resolution and FPS when background music is used`,
+        'error',
+        6000
+      );
+      switchTab('videos');
+      return;
+    }
+  }
   
   const playlistData = {
     name: name,
@@ -753,14 +795,14 @@ function submitPlaylist() {
 document.getElementById('searchVideos').addEventListener('input', updateAvailableVideosDisplay);
 document.getElementById('searchAudios').addEventListener('input', updateAvailableAudiosDisplay);
 
-function showToast(message, type = 'info') {
+function showToast(message, type = 'info', duration = 3000) {
   const toast = document.createElement('div');
-  toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white z-50 ${
+  toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white z-50 max-w-sm text-sm ${
     type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-blue-600'
   }`;
   toast.textContent = message;
   document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
+  setTimeout(() => toast.remove(), duration);
 }
 
 let videoSortable = null;
@@ -833,7 +875,10 @@ function renderSelectedVideos() {
         <img src="${video.thumbnail_path}" alt="${video.title}" class="w-12 h-8 object-cover rounded" onerror="this.src='/images/default-thumbnail.jpg'">
         <div class="flex-1 min-w-0">
           <p class="text-sm font-medium truncate">${video.title}</p>
-          <p class="text-xs text-gray-400">${formatDuration(video.duration)}</p>
+          <p class="text-xs text-gray-400">${formatDuration(video.duration)}
+          • ${video.resolution}
+          • ${video.fps} fps
+          </p>
         </div>
         <button type="button" onclick="removeVideoFromPlaylist('${video.id}')" class="text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
           <i class="ti ti-x"></i>

@@ -392,22 +392,6 @@
               </div>
             </div>
             <div class="space-y-4">
-              <!-- Info panel: Simple mode playlist encoding (hanya muncul saat pilih playlist) -->
-              <div id="simpleModeInfoPanel" class="hidden rounded-lg border border-blue-600/30 bg-blue-900/10 p-3">
-                <div class="flex items-start gap-2">
-                  <i class="ti ti-info-circle text-blue-400 text-sm mt-0.5 flex-shrink-0"></i>
-                  <div>
-                    <p class="text-blue-200 text-xs font-medium mb-1">Simple Mode — Playlist Encoding</p>
-                    <p class="text-blue-300/70 text-xs mb-2">Playlist always will be re-encoded automatically to ensure all videos can stream smoothly.</p>
-                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-400">
-                      <span><span class="text-gray-500">Resolution</span> · <span class="text-white font-mono">1280×720</span></span>
-                      <span><span class="text-gray-500">Frame Rate</span> · <span class="text-white font-mono">30 fps</span></span>
-                      <span><span class="text-gray-500">Video Codec</span> · <span class="text-white font-mono">libx264 veryfast</span></span>
-                      <span><span class="text-gray-500">Video Bitrate</span> · <span class="text-white font-mono">2500 kbps</span></span>
-                    </div>
-                  </div>
-                </div>
-              </div>
               <div class="pt-2 border-t border-gray-700">
                 <button type="button" id="advancedSettingsToggle"
                   class="flex items-center justify-between w-full text-left">
@@ -877,22 +861,6 @@
               </div>
             </div>
             <div class="space-y-4">
-              <!-- Info panel: Simple mode playlist encoding (hanya muncul saat pilih playlist) -->
-              <div id="editSimpleModeInfoPanel" class="hidden rounded-lg border border-blue-600/30 bg-blue-900/10 p-3">
-                <div class="flex items-start gap-2">
-                  <i class="ti ti-info-circle text-blue-400 text-sm mt-0.5 flex-shrink-0"></i>
-                  <div>
-                    <p class="text-blue-200 text-xs font-medium mb-1">Simple Mode — Playlist Encoding</p>
-                    <p class="text-blue-300/70 text-xs mb-2">Playlist always will be re-encoded automatically to ensure all videos can stream smoothly.</p>
-                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-400">
-                      <span><span class="text-gray-500">Resolution</span> · <span class="text-white font-mono">1280×720</span></span>
-                      <span><span class="text-gray-500">Frame Rate</span> · <span class="text-white font-mono">30 fps</span></span>
-                      <span><span class="text-gray-500">Video Codec</span> · <span class="text-white font-mono">libx264 veryfast</span></span>
-                      <span><span class="text-gray-500">Video Bitrate</span> · <span class="text-white font-mono">2500 kbps</span></span>
-                    </div>
-                  </div>
-                </div>
-              </div>
               <div class="pt-2 border-t border-gray-700">
                 <button type="button" id="editAdvancedSettingsToggle"
                   class="flex items-center justify-between w-full text-left">
@@ -1976,8 +1944,8 @@
       } else if (stream.use_advanced_settings) {
         settingsDisplay = `${stream.resolution || '1280x720'} • ${stream.bitrate || '2500'}kbps`;
       } else {
-        const videoRes = stream.video_resolution || stream.resolution || '1280x720';
-        const videoBitrate = stream.video_bitrate || stream.bitrate || '2500';
+        const videoRes = '1280x720';
+        const videoBitrate = '2500';
         settingsDisplay = `${videoRes} • ${videoBitrate}kbps`;
       }
       let statusBadge = '';
@@ -2052,9 +2020,9 @@
       } else if (stream.use_advanced_settings) {
         settingsDisplay = `${stream.resolution || '1280x720'} • ${stream.bitrate || '2500'} kbps • ${stream.fps || '30'} FPS`;
       } else {
-        const videoRes = stream.video_resolution || stream.resolution || '1280x720';
-        const videoBitrate = stream.video_bitrate || stream.bitrate || '2500';
-        const videoFps = stream.video_fps || stream.fps || '30';
+        const videoRes = '1280x720';
+        const videoBitrate = '2500';
+        const videoFps = '30';
         settingsDisplay = `${videoRes} • ${videoBitrate} kbps • ${videoFps} FPS`;
       }
       let durationDisplay = '';
@@ -3382,10 +3350,7 @@
       const minutes = String(serverDate.getMinutes()).padStart(2, '0');
       return `${year}-${month}-${day}T${hours}:${minutes}`;
     }
-    function closeEditStreamModal() {
-      const panel = document.getElementById('editSimpleModeInfoPanel');
-      if (panel) panel.classList.add('hidden');
-      
+    function closeEditStreamModal() {      
       const modal = document.getElementById('editStreamModal');
       
       modal.classList.remove('active');
@@ -4253,12 +4218,7 @@
       }
     });
 
-    // ─── Simple Mode Info Panel ──────────────────────────────────────────────
-    // Tampilkan panel encoding info saat playlist dipilih di new stream modal dan advanced settings off
     function updateSimpleModePanel() {
-      const panel = document.getElementById('simpleModeInfoPanel');
-      if (!panel) return;
-      
       const selectedVideoSpan = document.getElementById('selectedVideo');
       const displayText = selectedVideoSpan ? (selectedVideoSpan.textContent || '') : '';
       const isPlaylist = displayText.startsWith('[Playlist]');
@@ -4274,9 +4234,6 @@
     }
     
     function updateEditSimpleModePanel() {
-      const panel = document.getElementById('editSimpleModeInfoPanel');
-      if (!panel) return;
-      
       const selectedVideoSpan = document.getElementById('editSelectedVideo');
       const displayText = selectedVideoSpan ? (selectedVideoSpan.textContent || '') : '';
       const isPlaylist = displayText.startsWith('[Playlist]');
@@ -4315,11 +4272,8 @@
       }
     });
 
-    // Patch closeNewStreamModal agar panel juga direset
     const _origCloseNewStreamModal = typeof closeNewStreamModal === 'function' ? closeNewStreamModal : null;
     function closeNewStreamModal() {
-      const panel = document.getElementById('simpleModeInfoPanel');
-      if (panel) panel.classList.add('hidden');
       if (_origCloseNewStreamModal) _origCloseNewStreamModal();
       else {
         const modal = document.getElementById('newStreamModal');

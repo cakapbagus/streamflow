@@ -131,10 +131,13 @@ async function tryDownloadFromUrl(url, cookies, commonHeaders) {
   });
   
   const contentType = response.headers['content-type'] || '';
+  const contentLength = parseInt(response.headers['content-length'] || '0');
+  // Fix #2: Jika content-type kosong tapi ada content-length > 0, anggap bukan HTML (kemungkinan file binary)
   const isVideo = !contentType.includes('text/html') && 
                   (contentType.includes('video') || 
                    contentType.includes('octet-stream') ||
-                   contentType.includes('application/'));
+                   contentType.includes('application/') ||
+                   (contentType === '' && contentLength > 0));
   
   return { response, isVideo, contentType };
 }
@@ -215,11 +218,14 @@ async function downloadFile(fileId, progressCallback = null) {
           downloadSuccess = true;
           console.log(`Download started, content-type: ${result.contentType}`);
         } else {
-          cleanupStream(result.response);
-          
+          // Fix #4: Update cookies dari response terbaru sebelum destroy
+          const newCookies = extractCookies(result.response);
+          if (newCookies) cookies = newCookies;
+
+          // Fix #1: Baca data stream DULU sebelum destroy, bukan sebaliknya
           if (result.response.status === 200) {
             const chunks = [];
-            await new Promise((resolve, reject) => {
+            await new Promise((resolve) => {
               const timeout = setTimeout(() => {
                 result.response.data.destroy();
                 resolve();
@@ -252,6 +258,8 @@ async function downloadFile(fileId, progressCallback = null) {
                 }
               }
             }
+          } else {
+            cleanupStream(result.response);
           }
         }
       } catch (urlError) {
@@ -375,9 +383,14 @@ async function downloadFile(fileId, progressCallback = null) {
             }
           }
           
-          if (!isValidVideo && !buffer.includes(Buffer.from('ftyp'))) {
+          // Fix #3: Prioritaskan cek substring 'ftyp' karena ukuran box MP4 bervariasi
+          const hasFtyp = buffer.includes(Buffer.from('ftyp'));
+          if (!isValidVideo && !hasFtyp) {
             safeReject(new Error('Downloaded file is not a valid video format.'));
             return;
+          }
+          if (!isValidVideo && hasFtyp) {
+            isValidVideo = true; // ftyp ditemukan, file valid MP4/M4V/dll
           }
 
           let finalOriginalFilename = originalFilename || `gdrive_${fileId}.mp4`;
