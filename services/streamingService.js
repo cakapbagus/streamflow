@@ -7,7 +7,6 @@ const { db } = require('../db/database');
 const Stream = require('../models/Stream');
 const Playlist = require('../models/Playlist');
 const Video = require('../models/Video');
-const { getOverlaySettings } = require('../models/overlayModel');
 
 let ffmpegPath;
 if (fs.existsSync('/usr/bin/ffmpeg')) {
@@ -79,19 +78,6 @@ function cleanupStreamData(streamId) {
 function getRetryDelay(retryCount) {
   const delay = Math.min(BASE_RETRY_DELAY * Math.pow(1.5, retryCount), MAX_RETRY_DELAY);
   return delay + Math.random() * 1000;
-}
-
-function buildOverlayFilter(overlay) {
-  if (!overlay || !overlay.enabled || !overlay.image_path) return null;
-
-  const opacity = Math.min(1, Math.max(0, overlay.opacity ?? 1));
-  const x = overlay.position_x ?? 10;
-  const y = overlay.position_y ?? 10;
-  const w = overlay.width ?? 150;
-  const h = overlay.height ?? 150;
-
-  // FFmpeg overlay filter: scale logo → atur opacity → overlay ke posisi
-  return `movie='${overlay.image_path.replace(/\\/g, '/')}',scale=${w}:${h},format=rgba,colorchannelmixer=aa=${opacity}[logo];[in][logo]overlay=${x}:${y}[out]`;
 }
 
 async function buildFFmpegArgsForPlaylist(stream, playlist) {
@@ -194,13 +180,8 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
     throw err;
   }
 
-  const overlay = getOverlaySettings(stream.user_id);
-  const overlayFilter = buildOverlayFilter(overlay);
-
   const [width, height] = resolution.split('x');
-  const vfFilter = overlayFilter
-    ? `fps=${fps},scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,${overlayFilter}`  // scale dulu, baru overlay
-    : `fps=${fps},scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+  const vfFilter = `fps=${fps},scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
 
   return [
     '-nostdin',
@@ -251,15 +232,10 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
  * Video di-normalize ke resolusi/fps/bitrate target agar output stream konsisten.
  */
 function buildFFmpegArgsForSingleVideoInPlaylist(stream, videoPath, { rtmpUrl, resolution, bitrate, fps }) {
-  const overlay = getOverlaySettings(stream.user_id);
-  const overlayFilter = buildOverlayFilter(overlay);
-
   const [width, height] = resolution.split('x');
 
   // Gunakan scale+pad agar video dengan rasio berbeda tetap fit tanpa crop
-  const vfFilter = overlayFilter
-    ? `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,${overlayFilter}`  // scale dulu, baru overlay
-    : `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+  const vfFilter = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
 
   return [
     '-nostdin',
@@ -322,17 +298,12 @@ async function buildFFmpegArgs(stream) {
   const rtmpUrl = `${stream.rtmp_url.replace(/\/$/, '')}/${stream.stream_key}`;
   const loopValue = stream.loop_video ? '-1' : '0';
 
-  const overlay = getOverlaySettings(stream.user_id);
-  const overlayFilter = buildOverlayFilter(overlay);
-
   const resolution = stream.use_advanced_settings ? (stream.resolution || '1280x720') : '1280x720';
   const bitrate = stream.use_advanced_settings ? (stream.bitrate || 2500) : 2500;
   const fps = stream.use_advanced_settings ? (stream.fps || 30) : 30;
 
   const [width, height] = resolution.split('x');
-  const vfFilter = overlayFilter
-    ? `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,${overlayFilter}`  // scale dulu, baru overlay
-    : `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+  const vfFilter = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
 
   return [
     '-nostdin',

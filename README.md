@@ -306,15 +306,11 @@ pm2 restart streamflow
 - Set `NODE_ENV=production`
 - Akses melalui HTTPS untuk cookie session
 
-## 💫 Contributors
-
-[![Contributors](https://contrib.rocks/image?repo=cakapbagus/streamflow)](https://github.com/cakapbagus/streamflow/graphs/contributors)
-
 ## 📄 License
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/cakapbagus/streamflow/blob/main/LICENSE)
 
 ---
-© 2026 - [Bang Tutorial](https://youtube.com/cakapbagus)
+© 2026 - [cakapbagus](https://youtube.com/cakapbagus)
 
 

@@ -4,12 +4,19 @@ set -e
 
 echo "================================"
 echo "   StreamFlow Quick Installer  "
+echo "      forked by cakapbagus     "
 echo "================================"
 echo
 
-read -p "Mulai instalasi? (y/n): " -n 1 -r
+echo -ne "Mulai instalasi? (\033[1my\033[0m/n): "
+read -n 1 -r REPLY
 echo
-[[ ! $REPLY =~ ^[Yy]$ ]] && echo "Instalasi dibatalkan." && exit 1
+[[ $REPLY =~ ^[Nn]$ ]] && echo "Instalasi dibatalkan." && exit 1
+
+echo -ne "Environment [P]roduction atau [D]evelopment? (p/\033[1md\033[0m): "
+read -n 1 -r REPLY
+echo
+[[ $REPLY =~ ^[Pp]$ ]] && npm run generate-secret production || npm run generate-secret
 
 echo "🔄 Updating sistem..."
 sudo apt update && sudo apt upgrade -y
@@ -21,12 +28,12 @@ if command -v node &> /dev/null; then
         echo "✅ Node.js sudah terinstall ($(node -v)), skip..."
     else
         echo "⚠️ Node.js versi $(node -v) terlalu lama, upgrade ke v18..."
-        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+        curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
         sudo apt-get install -y nodejs
     fi
 else
     echo "📦 Installing Node.js v18..."
-    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+    curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
     sudo apt-get install -y nodejs
 fi
 
@@ -52,7 +59,6 @@ cd streamflow
 
 echo "⚙️ Installing dependencies..."
 npm install
-npm run generate-secret
 
 echo "🕐 Setup timezone ke Asia/Jakarta..."
 sudo timedatectl set-timezone Asia/Jakarta

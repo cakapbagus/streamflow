@@ -7,6 +7,53 @@ let isStreamKeyValid = true;
 let currentPlatform = 'Custom';
 let audioCodecWarningActive = false;
 
+// ── Folder state untuk create-stream picker ──
+let _createStreamActiveFolder = null;  // null = semua
+let _createStreamAllFolders = [];
+
+function _buildCreateFolderNav() {
+  const nav = document.getElementById('createStreamFolderNav');
+  if (!nav) return;
+  const rootFolders = _createStreamAllFolders.filter(f => !f.parent_id);
+  nav.innerHTML = '';
+  const mkBtn = (id, label, icon, isActive) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors border ${
+      isActive ? 'bg-primary/20 text-primary border-primary/40' : 'bg-dark-600 text-gray-400 hover:text-white border-transparent'
+    }`;
+    btn.innerHTML = `<i class="ti ${icon} text-xs"></i><span>${label}</span>`;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _createStreamActiveFolder = id;
+      _buildCreateFolderNav();
+      if (window.allStreamVideos) displayFilteredVideos(window.allStreamVideos);
+    });
+    return btn;
+  };
+  // Selalu render tombol All
+  nav.appendChild(mkBtn(null, 'All', 'ti-home', _createStreamActiveFolder === null));
+  // Render folder buttons jika ada
+  rootFolders.forEach(f => nav.appendChild(mkBtn(f.id, f.name, 'ti-folder', _createStreamActiveFolder === f.id)));
+  // Sembunyikan nav jika tidak ada folder (hanya ada tombol All)
+  nav.style.display = rootFolders.length === 0 ? 'none' : '';
+}
+
+async function _loadFoldersForCreate() {
+  if (_createStreamAllFolders.length > 0) {
+    _buildCreateFolderNav();
+    return;
+  }
+  try {
+    const res = await fetch('/api/folders');
+    const data = await res.json();
+    if (data.success) {
+      _createStreamAllFolders = data.folders || [];
+      _buildCreateFolderNav();
+    }
+  } catch (e) {}
+}
+
 function openNewStreamModal() {
   const modal = document.getElementById('newStreamModal');
   document.body.style.overflow = 'hidden';
@@ -120,6 +167,7 @@ async function loadGalleryVideos() {
     const response = await fetch('/api/stream/content');
     const content = await response.json();
     window.allStreamVideos = content;
+    await _loadFoldersForCreate();   // tunggu folder dulu baru render
     displayFilteredVideos(content);
     const searchInput = document.getElementById('videoSearchInput');
     if (searchInput) { searchInput.removeEventListener('input', handleVideoSearch); searchInput.addEventListener('input', handleVideoSearch); setTimeout(() => searchInput.focus(), 10); }
@@ -145,7 +193,11 @@ function displayFilteredVideos(videos) {
     return;
   }
   const playlists = videos.filter(item => item.type === 'playlist');
-  const regularVideos = videos.filter(item => item.type !== 'playlist');
+  // Filter video by folder aktif
+  let regularVideos = videos.filter(item => item.type !== 'playlist');
+  if (_createStreamActiveFolder !== null) {
+    regularVideos = regularVideos.filter(v => String(v.folder_id) === String(_createStreamActiveFolder));
+  }
   const hasPlaylists = playlists.length > 0;
   const hasVideos = regularVideos.length > 0;
   if (hasPlaylists) {
@@ -191,6 +243,8 @@ function resetModalForm() {
   const form = document.getElementById('newStreamForm');
   form.reset();
   selectedVideoData = null;
+  _createStreamActiveFolder = null;
+  _buildCreateFolderNav();
   document.getElementById('selectedVideo').textContent = 'Choose a video...';
   const desktopPreview = document.getElementById('videoPreview');
   const desktopEmptyPreview = document.getElementById('emptyPreview');

@@ -142,11 +142,6 @@
             class="w-full bg-dark-700 border border-gray-600 text-white pl-9 pr-4 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
           <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
         </div>
-        <a href="/overlay"
-          class="w-full sm:w-auto flex items-center justify-center gap-2 bg-dark-700 hover:bg-dark-600 border border-gray-600 text-gray-300 hover:text-white px-4 py-2 rounded-lg transition-colors">
-          <i class="ti ti-photo-up"></i>
-          <span>Overlay Logo</span>
-        </a>
         <button onclick="openNewStreamModal()"
           class="w-full sm:w-auto flex items-center justify-center gap-2 bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
           <i class="ti ti-plus"></i>
@@ -251,6 +246,7 @@
                           <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                         </div>
                       </div>
+                      <div id="createStreamFolderNav" class="px-2 pt-1.5 pb-1 flex items-center gap-1 flex-wrap border-b border-gray-600/50 min-h-[34px]"></div>
                       <div id="videoListContainer" class="p-2 space-y-1 max-h-60 overflow-y-auto">
                       </div>
                     </div>
@@ -505,6 +501,7 @@
                             <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                           </div>
                         </div>
+                        <div id="ytCreateFolderNav" class="px-2 pt-1.5 pb-1 flex items-center gap-1 flex-wrap border-b border-gray-600/50 min-h-[34px]"></div>
                         <div id="ytVideoListContainer" class="p-2 space-y-1 max-h-60 overflow-y-auto"></div>
                       </div>
                     </div>
@@ -720,6 +717,7 @@
                           <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                         </div>
                       </div>
+                      <div id="editStreamFolderNav" class="px-2 pt-1.5 pb-1 flex items-center gap-1 flex-wrap border-b border-gray-600/50 min-h-[34px]"></div>
                       <div id="editVideoListContainer" class="p-2 space-y-1 max-h-60 overflow-y-auto">
                       </div>
                     </div>
@@ -974,6 +972,7 @@
                             <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                           </div>
                         </div>
+                        <div id="editYtFolderNav" class="px-2 pt-1.5 pb-1 flex items-center gap-1 flex-wrap border-b border-gray-600/50 min-h-[34px]"></div>
                         <div id="editYtVideoListContainer" class="p-2 space-y-1 max-h-60 overflow-y-auto"></div>
                       </div>
                     </div>
@@ -2521,86 +2520,143 @@
       dropdown.classList.toggle('hidden');
     }
 
+    // ── Shared folder nav builder (untuk semua picker di dashboard) ──
+    let _dashAllFolders = [];
+    async function _loadDashFolders() {
+      if (_dashAllFolders.length > 0) return _dashAllFolders;
+      try {
+        const res = await fetch('/api/folders');
+        const data = await res.json();
+        if (data.success) _dashAllFolders = data.folders || [];
+      } catch (e) {}
+      return _dashAllFolders;
+    }
+    function _buildDashFolderNav(navId, activeFolder, onSelect) {
+      const nav = document.getElementById(navId);
+      if (!nav) return;
+      const rootFolders = _dashAllFolders.filter(f => !f.parent_id);
+      nav.innerHTML = '';
+      const mkBtn = (id, label, icon, isActive) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors border ${
+          isActive ? 'bg-primary/20 text-primary border-primary/40' : 'bg-dark-600 text-gray-400 hover:text-white border-transparent'
+        }`;
+        btn.innerHTML = `<i class="ti ${icon} text-xs"></i><span>${label}</span>`;
+        btn.addEventListener('click', (e) => { e.stopPropagation(); onSelect(id); });
+        return btn;
+      };
+      nav.appendChild(mkBtn(null, 'All', 'ti-home', activeFolder === null));
+      rootFolders.forEach(f => nav.appendChild(mkBtn(f.id, f.name, 'ti-folder', activeFolder === f.id)));
+    }
+
+    // ── YT Create picker folder state ──
+    let _ytCreateActiveFolder = null;
+
     let ytVideosLoaded = false;
+    let _ytAllVideosData = null;
+
     function loadYoutubeVideos() {
       if (ytVideosLoaded) return;
-      
       fetch('/api/videos')
         .then(response => response.json())
-        .then(data => {
+        .then(async data => {
           if (data.success) {
-            const container = document.getElementById('ytVideoListContainer');
-            container.innerHTML = '';
-            
-            const hasPlaylists = data.playlists && data.playlists.length > 0;
-            const hasVideos = data.videos && data.videos.length > 0;
-            
-            if (!hasPlaylists && !hasVideos) {
-              container.innerHTML = '<div class="text-center text-gray-400 py-4">No videos or playlists found</div>';
-              return;
-            }
-            
-            if (hasPlaylists) {
-              const playlistHeader = document.createElement('div');
-              playlistHeader.className = 'text-xs text-gray-400 px-2 py-1 font-medium';
-              playlistHeader.textContent = 'Playlists';
-              container.appendChild(playlistHeader);
-              
-              data.playlists.forEach(playlist => {
-                const item = document.createElement('div');
-                item.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-dark-600 cursor-pointer transition-colors';
-                item.onclick = () => selectYoutubeVideo({ id: playlist.id, title: playlist.name, type: 'playlist', videoCount: playlist.video_count, audioCount: playlist.audio_count, is_shuffle: playlist.is_shuffle });
-                let countText = `${playlist.video_count || 0} videos`;
-                if (playlist.audio_count && playlist.audio_count > 0) {
-                  countText += ` • ${playlist.audio_count} audio`;
-                }
-                item.innerHTML = `
-                  <div class="w-16 h-10 bg-primary/20 rounded overflow-hidden flex-shrink-0 flex items-center justify-center">
-                    <i class="ti ti-playlist text-primary text-lg"></i>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm text-white truncate">${playlist.name}</p>
-                    <p class="text-xs text-gray-400">${countText}</p>
-                  </div>
-                `;
-                container.appendChild(item);
-              });
-            }
-            
-            if (hasVideos) {
-              if (hasPlaylists) {
-                const divider = document.createElement('div');
-                divider.className = 'border-t border-gray-600 my-2';
-                container.appendChild(divider);
-              }
-              
-              const videoHeader = document.createElement('div');
-              videoHeader.className = 'text-xs text-gray-400 px-2 py-1 font-medium';
-              videoHeader.textContent = 'Videos';
-              container.appendChild(videoHeader);
-              
-              data.videos.forEach(video => {
-                const item = document.createElement('div');
-                item.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-dark-600 cursor-pointer transition-colors';
-                item.onclick = () => selectYoutubeVideo(video);
-                item.innerHTML = `
-                  <div class="w-16 h-10 bg-dark-800 rounded overflow-hidden flex-shrink-0">
-                    <img src="${video.thumbnail_path || '/images/default-video-thumbnail.svg'}" class="w-full h-full object-cover" alt="${video.title}">
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm text-white truncate">${video.title}</p>
-                    <p class="text-xs text-gray-400">${formatDuration(video.duration)}</p>
-                  </div>
-                `;
-                container.appendChild(item);
-              });
-            }
-            
+            _ytAllVideosData = data;
+            await _loadDashFolders();
+            renderYtCreateVideos();
             ytVideosLoaded = true;
           }
         })
         .catch(error => console.error('Error loading videos:', error));
     }
+
+    function renderYtCreateVideos() {
+      if (!_ytAllVideosData) return;
+      const data = _ytAllVideosData;
+      const container = document.getElementById('ytVideoListContainer');
+      container.innerHTML = '';
+
+      _buildDashFolderNav('ytCreateFolderNav', _ytCreateActiveFolder, (folderId) => {
+        _ytCreateActiveFolder = folderId;
+        renderYtCreateVideos();
+      });
+
+      const hasPlaylists = data.playlists && data.playlists.length > 0;
+      let videoPool = data.videos || [];
+      if (_ytCreateActiveFolder !== null) {
+        videoPool = videoPool.filter(v => String(v.folder_id) === String(_ytCreateActiveFolder));
+      }
+      const hasVideos = videoPool.length > 0;
+
+      if (!hasPlaylists && !hasVideos) {
+        container.innerHTML = '<div class="text-center text-gray-400 py-4">No videos or playlists found</div>';
+        return;
+      }
+      if (hasPlaylists) {
+        const playlistHeader = document.createElement('div');
+        playlistHeader.className = 'text-xs text-gray-400 px-2 py-1 font-medium';
+        playlistHeader.textContent = 'Playlists';
+        container.appendChild(playlistHeader);
+        data.playlists.forEach(playlist => {
+          const item = document.createElement('div');
+          item.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-dark-600 cursor-pointer transition-colors';
+          item.onclick = () => selectYoutubeVideo({ id: playlist.id, title: playlist.name, type: 'playlist', videoCount: playlist.video_count, audioCount: playlist.audio_count, is_shuffle: playlist.is_shuffle });
+          let countText = `${playlist.video_count || 0} videos`;
+          if (playlist.audio_count && playlist.audio_count > 0) countText += ` • ${playlist.audio_count} audio`;
+          item.innerHTML = `
+            <div class="w-16 h-10 bg-primary/20 rounded overflow-hidden flex-shrink-0 flex items-center justify-center">
+              <i class="ti ti-playlist text-primary text-lg"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-white truncate">${playlist.name}</p>
+              <p class="text-xs text-gray-400">${countText}</p>
+            </div>
+          `;
+          container.appendChild(item);
+        });
+      }
+      if (hasVideos) {
+        if (hasPlaylists) {
+          const divider = document.createElement('div');
+          divider.className = 'border-t border-gray-600 my-2';
+          container.appendChild(divider);
+        }
+        const videoHeader = document.createElement('div');
+        videoHeader.className = 'text-xs text-gray-400 px-2 py-1 font-medium';
+        videoHeader.textContent = 'Videos';
+        container.appendChild(videoHeader);
+        videoPool.forEach(video => {
+          const item = document.createElement('div');
+          item.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-dark-600 cursor-pointer transition-colors';
+          item.onclick = () => selectYoutubeVideo(video);
+          item.innerHTML = `
+            <div class="w-16 h-10 bg-dark-800 rounded overflow-hidden flex-shrink-0">
+              <img src="${video.thumbnail_path || '/images/default-video-thumbnail.svg'}" class="w-full h-full object-cover" alt="${video.title}">
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-white truncate">${video.title}</p>
+              <p class="text-xs text-gray-400">${formatDuration(video.duration)}</p>
+            </div>
+          `;
+          container.appendChild(item);
+        });
+      }
+    }
+
+    // Search handler for YT create picker
+    document.getElementById('ytVideoSearchInput')?.addEventListener('input', function() {
+      if (!_ytAllVideosData) return;
+      const term = this.value.toLowerCase().trim();
+      const filtered = { ..._ytAllVideosData };
+      if (term) {
+        filtered.videos = (_ytAllVideosData.videos || []).filter(v => v.title.toLowerCase().includes(term));
+        filtered.playlists = (_ytAllVideosData.playlists || []).filter(p => p.name.toLowerCase().includes(term));
+      }
+      _ytAllVideosData = { ...filtered, _orig: _ytAllVideosData._orig || _ytAllVideosData };
+      renderYtCreateVideos();
+      _ytAllVideosData = _ytAllVideosData._orig || _ytAllVideosData;
+    });
 
     function selectYoutubeVideo(video) {
       document.getElementById('ytSelectedVideoId').value = video.id;
@@ -2918,19 +2974,19 @@
     let editYtVideosLoaded = false;
     let editYtAllVideos = [];
     let editYtAllPlaylists = [];
-    
+    let _editYtActiveFolder = null;
+
     function loadEditYoutubeVideos() {
       if (editYtVideosLoaded) return;
-      
       const container = document.getElementById('editYtVideoListContainer');
       container.innerHTML = '<div class="text-center text-gray-400 py-4"><i class="ti ti-loader animate-spin font-loaded"></i> Loading videos...</div>';
-      
       fetch('/api/videos')
         .then(response => response.json())
-        .then(data => {
+        .then(async data => {
           if (data.success) {
             editYtAllVideos = data.videos;
             editYtAllPlaylists = data.playlists || [];
+            await _loadDashFolders();
             renderEditYoutubeVideos(editYtAllVideos, editYtAllPlaylists);
             editYtVideosLoaded = true;
           }
@@ -2940,33 +2996,38 @@
           container.innerHTML = '<div class="text-center text-red-400 py-4">Failed to load videos</div>';
         });
     }
-    
+
     function renderEditYoutubeVideos(videos, playlists = []) {
       const container = document.getElementById('editYtVideoListContainer');
       container.innerHTML = '';
-      
+
+      _buildDashFolderNav('editYtFolderNav', _editYtActiveFolder, (folderId) => {
+        _editYtActiveFolder = folderId;
+        renderEditYoutubeVideos(editYtAllVideos, editYtAllPlaylists);
+      });
+
       const hasPlaylists = playlists && playlists.length > 0;
-      const hasVideos = videos && videos.length > 0;
-      
+      let videoPool = videos || [];
+      if (_editYtActiveFolder !== null) {
+        videoPool = videoPool.filter(v => String(v.folder_id) === String(_editYtActiveFolder));
+      }
+      const hasVideos = videoPool.length > 0;
+
       if (!hasPlaylists && !hasVideos) {
         container.innerHTML = '<div class="text-center text-gray-400 py-4">No videos or playlists found</div>';
         return;
       }
-      
       if (hasPlaylists) {
         const playlistHeader = document.createElement('div');
         playlistHeader.className = 'text-xs text-gray-400 px-2 py-1 font-medium';
         playlistHeader.textContent = 'Playlists';
         container.appendChild(playlistHeader);
-        
         playlists.forEach(playlist => {
           const item = document.createElement('div');
           item.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-dark-600 cursor-pointer transition-colors';
           item.onclick = () => selectEditYoutubeVideo({ id: playlist.id, title: playlist.name, type: 'playlist', videoCount: playlist.video_count, audioCount: playlist.audio_count, is_shuffle: playlist.is_shuffle });
           let countText = `${playlist.video_count || 0} videos`;
-          if (playlist.audio_count && playlist.audio_count > 0) {
-            countText += ` • ${playlist.audio_count} audio`;
-          }
+          if (playlist.audio_count && playlist.audio_count > 0) countText += ` • ${playlist.audio_count} audio`;
           item.innerHTML = `
             <div class="w-16 h-10 bg-primary/20 rounded overflow-hidden flex-shrink-0 flex items-center justify-center">
               <i class="ti ti-playlist text-primary text-lg"></i>
@@ -2979,20 +3040,17 @@
           container.appendChild(item);
         });
       }
-      
       if (hasVideos) {
         if (hasPlaylists) {
           const divider = document.createElement('div');
           divider.className = 'border-t border-gray-600 my-2';
           container.appendChild(divider);
         }
-        
         const videoHeader = document.createElement('div');
         videoHeader.className = 'text-xs text-gray-400 px-2 py-1 font-medium';
         videoHeader.textContent = 'Videos';
         container.appendChild(videoHeader);
-        
-        videos.forEach(video => {
+        videoPool.forEach(video => {
           const item = document.createElement('div');
           item.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-dark-600 cursor-pointer transition-colors';
           item.onclick = () => selectEditYoutubeVideo(video);
@@ -3444,17 +3502,17 @@
         dropdown.classList.add('hidden');
       }
     }
+    let _editStreamActiveFolder = null;
+
     async function loadEditGalleryVideos() {
       const container = document.getElementById('editVideoListContainer');
-      if (!container) {
-        console.error("Edit video list container not found");
-        return;
-      }
+      if (!container) { console.error("Edit video list container not found"); return; }
       container.innerHTML = '<div class="text-center py-3"><i class="ti ti-loader animate-spin mr-2"></i>Loading content...</div>';
       try {
         const response = await fetch('/api/stream/content');
         const content = await response.json();
         window.allEditStreamContent = content;
+        await _loadDashFolders();
         displayEditFilteredVideos(content);
         const searchInput = document.getElementById('editVideoSearchInput');
         if (searchInput) {
@@ -3467,23 +3525,34 @@
         container.innerHTML = '<div class="text-center py-5 text-red-400"><i class="ti ti-alert-circle text-2xl mb-2"></i><p>Failed to load content</p></div>';
       }
     }
+
     function handleEditVideoSearch(e) {
       const searchTerm = e.target.value.toLowerCase();
-      const filteredContent = window.allEditStreamContent.filter(item =>
+      const filteredContent = (window.allEditStreamContent || []).filter(item =>
         item.name.toLowerCase().includes(searchTerm) ||
         (item.type === 'playlist' && item.description && item.description.toLowerCase().includes(searchTerm))
       );
       displayEditFilteredVideos(filteredContent);
     }
+
     function displayEditFilteredVideos(videos) {
       const container = document.getElementById('editVideoListContainer');
+
+      _buildDashFolderNav('editStreamFolderNav', _editStreamActiveFolder, (folderId) => {
+        _editStreamActiveFolder = folderId;
+        displayEditFilteredVideos(window.allEditStreamContent || []);
+      });
+
       if (!videos || !videos.length) {
         container.innerHTML = '<div class="text-center py-5 text-gray-400"><p>No content found</p></div>';
         return;
       }
       container.innerHTML = '';
       const playlists = videos.filter(item => item.type === 'playlist');
-      const regularVideos = videos.filter(item => item.type !== 'playlist');
+      let regularVideos = videos.filter(item => item.type !== 'playlist');
+      if (_editStreamActiveFolder !== null) {
+        regularVideos = regularVideos.filter(v => String(v.folder_id) === String(_editStreamActiveFolder));
+      }
       const hasPlaylists = playlists.length > 0;
       const hasVideos = regularVideos.length > 0;
       if (hasPlaylists) {
@@ -3497,9 +3566,7 @@
           button.className = 'w-full flex items-center gap-3 p-2 rounded-lg hover:bg-dark-600 cursor-pointer transition-colors text-left';
           button.onclick = () => selectEditVideo(item);
           let countText = `${item.videoCount || 0} videos`;
-          if (item.audioCount && item.audioCount > 0) {
-            countText += ` • ${item.audioCount} audio`;
-          }
+          if (item.audioCount && item.audioCount > 0) countText += ` • ${item.audioCount} audio`;
           button.innerHTML = `<div class="w-16 h-10 bg-primary/20 rounded overflow-hidden flex-shrink-0 flex items-center justify-center"><i class="ti ti-playlist text-primary text-lg"></i></div><div class="flex-1 min-w-0"><p class="text-sm text-white truncate">${item.name}</p><p class="text-xs text-gray-400">${countText}</p></div>`;
           container.appendChild(button);
         });

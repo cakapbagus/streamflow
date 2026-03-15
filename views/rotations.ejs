@@ -463,6 +463,37 @@
 <script>
 const videos = <%- JSON.stringify(videos) %>;
 const playlists = <%- JSON.stringify(playlists || []) %>;
+let allFolders = <%- JSON.stringify(typeof folders !== 'undefined' ? folders : []) %>;
+
+// Fetch folders jika belum di-pass dari server
+if (allFolders.length === 0) {
+  fetch('/api/folders')
+    .then(r => r.json())
+    .then(data => { if (data.success) allFolders = data.folders || []; })
+    .catch(() => {});
+}
+
+function buildVideoFolderNav(navEl, activeFolder, onSelect) {
+  const rootFolders = allFolders.filter(f => !f.parent_id);
+  const mkBtn = (id, label, icon, isActive) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors border ${
+      isActive
+        ? 'bg-primary/20 text-primary border-primary/40'
+        : 'bg-dark-600 text-gray-400 hover:text-white border-transparent'
+    }`;
+    btn.innerHTML = `<i class="ti ${icon} text-xs ${isActive && id !== null ? 'text-yellow-400' : ''}"></i><span>${label}</span>`;
+    btn.addEventListener('click', (e) => { e.stopPropagation(); onSelect(id); });
+    return btn;
+  };
+
+  navEl.innerHTML = '';
+  navEl.appendChild(mkBtn(null, 'All', 'ti-home', activeFolder === null));
+  rootFolders.forEach(f => {
+    navEl.appendChild(mkBtn(f.id, f.name, 'ti-folder', activeFolder === f.id));
+  });
+}
 const csrfToken = '<%= csrfToken %>';
 let rotationItemCount = 0;
 
@@ -611,6 +642,9 @@ function addRotationItem() {
                   <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                 </div>
               </div>
+              <div class="video-folder-nav px-2 pt-1.5 pb-1 flex items-center gap-1 flex-wrap border-b border-gray-600/50 min-h-[34px]">
+                <!-- folder buttons injected by JS -->
+              </div>
               <div class="video-list-container p-2 space-y-1 max-h-60 overflow-y-auto"></div>
             </div>
           </div>
@@ -667,12 +701,25 @@ function initVideoSelector(itemEl, idx) {
   const dropdown = itemEl.querySelector('.video-selector-dropdown');
   const searchInput = itemEl.querySelector('.video-search-input');
   const listContainer = itemEl.querySelector('.video-list-container');
+  const folderNav = itemEl.querySelector('.video-folder-nav');
   const hiddenInput = itemEl.querySelector('.video-id-input');
   const selectedText = itemEl.querySelector('.selected-video-text');
-  
+
+  let activeFolder = null; // null = semua folder
+
+  function refreshFolderNav() {
+    buildVideoFolderNav(folderNav, activeFolder, (folderId) => {
+      activeFolder = folderId;
+      refreshFolderNav();
+      renderVideoList(searchInput.value);
+    });
+  }
+  refreshFolderNav();
+
   function renderVideoList(filter = '') {
     let html = '';
-    
+
+    // Playlists — tidak difilter by folder
     const filteredPlaylists = playlists.filter(p => p.name.toLowerCase().includes(filter.toLowerCase()));
     if (filteredPlaylists.length > 0) {
       html += '<div class="text-xs text-gray-400 px-2 py-1 font-medium">Playlists</div>';
@@ -691,8 +738,14 @@ function initVideoSelector(itemEl, idx) {
         `;
       }).join('');
     }
-    
-    const filteredVideos = videos.filter(v => v.title.toLowerCase().includes(filter.toLowerCase()));
+
+    // Videos — filter by folder jika aktif
+    let videoPool = videos;
+    if (activeFolder !== null) {
+      videoPool = videos.filter(v => String(v.folder_id) === String(activeFolder));
+    }
+    const filteredVideos = videoPool.filter(v => v.title.toLowerCase().includes(filter.toLowerCase()));
+
     if (filteredVideos.length > 0) {
       if (filteredPlaylists.length > 0) {
         html += '<div class="border-t border-gray-600 my-2"></div>';
@@ -716,9 +769,9 @@ function initVideoSelector(itemEl, idx) {
         `;
       }).join('');
     }
-    
+
     listContainer.innerHTML = html || '<p class="text-center text-gray-500 py-4 text-sm">No videos or playlists found</p>';
-    
+
     listContainer.querySelectorAll('.video-option').forEach(opt => {
       opt.addEventListener('click', () => {
         hiddenInput.value = opt.dataset.id;

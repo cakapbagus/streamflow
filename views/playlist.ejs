@@ -189,6 +189,14 @@
                       <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                     </div>
                   </div>
+                  <!-- Folder navigator -->
+                  <div id="videoFolderNav" class="px-2 pt-2 pb-1 flex items-center gap-1 flex-wrap border-b border-gray-600/50 min-h-[36px]">
+                    <button type="button" onclick="setVideoFolder(null)"
+                      class="video-folder-btn flex items-center gap-1 px-2 py-1 rounded text-xs bg-primary/20 text-primary border border-primary/40">
+                      <i class="ti ti-home text-xs"></i>
+                      <span>All</span>
+                    </button>
+                  </div>
                   <div id="availableVideos" class="p-2 space-y-1 max-h-64 overflow-y-auto custom-scrollbar">
                     <% if (videos && videos.length > 0) { %>
                       <% videos.forEach(function(video) { %>
@@ -253,6 +261,14 @@
                         class="w-full bg-dark-800 text-white pl-8 pr-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary border border-gray-700">
                       <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                     </div>
+                  </div>
+                  <!-- Folder navigator -->
+                  <div id="audioFolderNav" class="px-2 pt-2 pb-1 flex items-center gap-1 flex-wrap border-b border-gray-600/50 min-h-[36px]">
+                    <button type="button" onclick="setAudioFolder(null)"
+                      class="audio-folder-btn flex items-center gap-1 px-2 py-1 rounded text-xs bg-primary/20 text-primary border border-primary/40">
+                      <i class="ti ti-home text-xs"></i>
+                      <span>All</span>
+                    </button>
                   </div>
                   <div id="availableAudios" class="p-2 space-y-1 max-h-64 overflow-y-auto custom-scrollbar">
                     <% if (audios && audios.length > 0) { %>
@@ -368,6 +384,67 @@ let selectedAudios = [];
 let currentPlaylistId = null;
 let allVideos = <%- JSON.stringify(videos || []) %>;
 let allAudios = <%- JSON.stringify(audios || []) %>;
+let allFolders = <%- JSON.stringify(typeof folders !== 'undefined' ? folders : []) %>;
+let activeVideoFolder = null;  // null = tampil semua
+let activeAudioFolder = null;
+
+// ── Folder navigator ──────────────────────────────────────────────
+function buildFolderNav(navId, btnClass, setFn, activeFolder) {
+  const nav = document.getElementById(navId);
+  if (!nav) return;
+
+  // Kumpulkan folder yang relevan (parent_id null = root level)
+  const rootFolders = allFolders.filter(f => !f.parent_id);
+
+  // Bangun tombol: All + tiap folder
+  const allBtn = `
+    <button type="button" onclick="${setFn}(null)"
+      class="${btnClass} flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors
+             ${activeFolder === null ? 'bg-primary/20 text-primary border border-primary/40' : 'bg-dark-600 text-gray-400 hover:text-white border border-transparent'}">
+      <i class="ti ti-home text-xs"></i><span>All</span>
+    </button>`;
+
+  const folderBtns = rootFolders.map(f => `
+    <button type="button" onclick="${setFn}(${f.id})"
+      class="${btnClass} flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors
+             ${activeFolder === f.id ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40' : 'bg-dark-600 text-gray-400 hover:text-white border border-transparent'}">
+      <i class="ti ti-folder text-xs ${activeFolder === f.id ? 'text-yellow-400' : 'text-gray-500'}"></i>
+      <span>${f.name}</span>
+    </button>`).join('');
+
+  nav.innerHTML = allBtn + folderBtns;
+}
+
+function setVideoFolder(folderId) {
+  activeVideoFolder = folderId;
+  buildFolderNav('videoFolderNav', 'video-folder-btn', 'setVideoFolder', activeVideoFolder);
+  updateAvailableVideosDisplay();
+}
+
+function setAudioFolder(folderId) {
+  activeAudioFolder = folderId;
+  buildFolderNav('audioFolderNav', 'audio-folder-btn', 'setAudioFolder', activeAudioFolder);
+  updateAvailableAudiosDisplay();
+}
+
+function initFolderNavs() {
+  // Fetch terbaru dari API kalau belum ada data folder
+  if (allFolders.length === 0) {
+    fetch('/api/folders')
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          allFolders = data.folders || [];
+          buildFolderNav('videoFolderNav', 'video-folder-btn', 'setVideoFolder', activeVideoFolder);
+          buildFolderNav('audioFolderNav', 'audio-folder-btn', 'setAudioFolder', activeAudioFolder);
+        }
+      })
+      .catch(() => {});
+  } else {
+    buildFolderNav('videoFolderNav', 'video-folder-btn', 'setVideoFolder', activeVideoFolder);
+    buildFolderNav('audioFolderNav', 'audio-folder-btn', 'setAudioFolder', activeAudioFolder);
+  }
+}
 let currentTab = 'videos';
 
 function switchTab(tab) {
@@ -444,6 +521,9 @@ function openCreatePlaylistModal() {
   updateSelectedAudiosDisplay();
   updateAvailableAudiosDisplay();
   updateBadges();
+  activeVideoFolder = null;
+  activeAudioFolder = null;
+  initFolderNavs();
   const modal = document.getElementById('playlistModal');
   document.body.style.overflow = 'hidden';
   modal.classList.remove('hidden');
@@ -532,7 +612,16 @@ function updateAvailableVideosDisplay() {
   const container = document.getElementById('availableVideos');
   const searchTerm = document.getElementById('searchVideos')?.value?.toLowerCase() || '';
   const selectedIds = selectedVideos.map(v => v.id);
-  const available = allVideos.filter(v => !selectedIds.includes(v.id) && v.title.toLowerCase().includes(searchTerm));
+
+  buildFolderNav('videoFolderNav', 'video-folder-btn', 'setVideoFolder', activeVideoFolder);
+  
+  // Filter by folder
+  let pool = allVideos;
+  if (activeVideoFolder !== null) {
+    pool = pool.filter(v => String(v.folder_id) === String(activeVideoFolder));
+  }
+
+  const available = pool.filter(v => !selectedIds.includes(v.id) && v.title.toLowerCase().includes(searchTerm));
   
   if (available.length === 0) {
     container.innerHTML = `<div class="text-center py-8 text-gray-400">
@@ -568,7 +657,14 @@ function updateAvailableAudiosDisplay() {
   const container = document.getElementById('availableAudios');
   const searchTerm = document.getElementById('searchAudios')?.value?.toLowerCase() || '';
   const selectedIds = selectedAudios.map(a => a.id);
-  const available = allAudios.filter(a => !selectedIds.includes(a.id) && a.title.toLowerCase().includes(searchTerm));
+
+  // Filter by folder
+  let pool = allAudios;
+  if (activeAudioFolder !== null) {
+    pool = pool.filter(a => String(a.folder_id) === String(activeAudioFolder));
+  }
+
+  const available = pool.filter(a => !selectedIds.includes(a.id) && a.title.toLowerCase().includes(searchTerm));
   
   if (available.length === 0) {
     if (allAudios.length === 0) {

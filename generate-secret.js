@@ -21,12 +21,14 @@ function updateSessionSecret() {
       if (match) oldSecret = match[1].trim();
     }
 
+    const envArg = process.argv[2] || 'development';
+
     if (envContent && oldSecret) {
       envContent = envContent.replace(/SESSION_SECRET=.*/, `SESSION_SECRET=${newSecret}`);
     } else if (envContent) {
       envContent += `\nSESSION_SECRET=${newSecret}`;
     } else {
-      envContent = `PORT=7575\nSESSION_SECRET=${newSecret}\n`;
+      envContent = `PORT=7575\nNODE_ENV=${envArg}\nSESSION_SECRET=${newSecret}\n`;
     }
     fs.writeFileSync(envPath, envContent, 'utf8');
 

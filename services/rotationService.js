@@ -289,7 +289,7 @@ async function startRotationStream(rotation, item) {
         cdn: {
           frameRate: '30fps',
           ingestionType: 'rtmp',
-          resolution: '1080p'
+          resolution: '720p'
         }
       }
     });

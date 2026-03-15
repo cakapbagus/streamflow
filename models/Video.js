@@ -7,23 +7,24 @@ class Video {
     return new Promise((resolve, reject) => {
       const id = uuidv4();
       const now = new Date().toISOString();
+      const folderId = data.folder_id !== undefined ? data.folder_id : null;
       db.run(
         `INSERT INTO videos (
           id, title, filepath, thumbnail_path, file_size, 
-          duration, format, resolution, bitrate, fps, user_id, 
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          duration, format, resolution, bitrate, fps, user_id,
+          folder_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, data.title, data.filepath, data.thumbnail_path, data.file_size,
           data.duration, data.format, data.resolution, data.bitrate, data.fps, data.user_id,
-          now, now
+          folderId, now, now
         ],
         function (err) {
           if (err) {
             console.error('Error creating video:', err.message);
             return reject(err);
           }
-          resolve({ id, ...data, created_at: now, updated_at: now });
+          resolve({ id, ...data, folder_id: folderId, created_at: now, updated_at: now });
         }
       );
     });

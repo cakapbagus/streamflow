@@ -25,7 +25,12 @@
           <span id="diskUsageTextMobile"></span>
         </p>
       </div>
-      <div class="flex gap-3">
+      <div class="flex gap-3 flex-wrap">
+        <button onclick="openCreateFolderModal()"
+          class="flex items-center gap-2 bg-dark-700 border border-gray-600 hover:bg-dark-600 text-white px-4 py-2 rounded-lg transition-colors">
+          <i class="ti ti-folder-plus"></i>
+          <span>New Folder</span>
+        </button>
         <button onclick="openUploadModal()"
           class="flex items-center gap-2 bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
           <i class="ti ti-upload"></i>
@@ -65,9 +70,18 @@
       </div>
     </div>
 
+    <!-- Breadcrumb -->
+    <div id="breadcrumb" class="flex items-center gap-1.5 mb-4 text-sm text-gray-400 flex-wrap">
+      <button onclick="navigateToFolder(null)" class="hover:text-white transition-colors flex items-center gap-1">
+        <i class="ti ti-home text-xs"></i>
+        <span>Root</span>
+      </button>
+      <!-- breadcrumb items injected by JS -->
+    </div>
+
     <div class="bg-gray-800 rounded-lg shadow-md overflow-hidden">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-gray-700 gap-4">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 flex-wrap">
           <div class="relative w-full sm:w-64">
             <input type="text" id="searchInput" placeholder="Search videos..."
               class="w-full bg-dark-700 border border-gray-600 text-white pl-9 pr-4 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
@@ -88,6 +102,35 @@
           </select>
         </div>
         <div class="flex items-center gap-2">
+          <!-- Bulk action bar -->
+          <div id="bulkActionBar" class="hidden items-center gap-2 flex-wrap">
+            <span id="selectedCount" class="text-sm text-gray-400 mr-1"></span>
+            <button onclick="bulkMoveSelected()"
+              class="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors">
+              <i class="ti ti-folder-symlink"></i>
+              <span>Move Selected</span>
+            </button>
+            <button onclick="bulkCopySelected()"
+              class="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors">
+              <i class="ti ti-copy"></i>
+              <span>Copy Selected</span>
+            </button>
+            <button onclick="deleteSelected()"
+              class="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors">
+              <i class="ti ti-trash"></i>
+              <span>Delete Selected</span>
+            </button>
+            <button onclick="clearSelection()"
+              class="flex items-center gap-1.5 px-3 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 text-sm rounded-lg transition-colors" title="Clear selection">
+              <i class="ti ti-x"></i>
+            </button>
+          </div>
+          <!-- Select All button — selalu tampil -->
+          <button id="selectAllBtn" onclick="selectAll()"
+            class="flex items-center gap-1.5 px-3 py-2 bg-dark-700 border border-gray-600 hover:bg-dark-600 text-gray-300 text-sm rounded-lg transition-colors" title="Select all">
+            <i class="ti ti-checks"></i>
+            <span class="hidden sm:inline">Select All</span>
+          </button>
           <div class="flex items-center bg-dark-700 border border-gray-600 rounded-lg overflow-hidden">
             <button id="gridViewBtn" class="px-3 py-2 bg-primary text-white" title="Grid view">
               <i class="ti ti-layout-grid"></i>
@@ -101,139 +144,88 @@
       </div>
 
       <div class="p-4">
-        <% if (videos && videos.length> 0) { %>
-          <div id="gridView" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            <% videos.forEach(function(video) { const isAudio=video.filepath && (video.filepath.includes('/audio/') ||
-              video.filepath.endsWith('.m4a') || video.filepath.endsWith('.aac') || video.filepath.endsWith('.mp3'));
-              const mediaType=isAudio ? 'audio' : 'video' ; %>
-              <div
-                class="file-item group bg-dark-700 rounded-lg overflow-hidden border border-transparent hover:border-gray-600 hover:bg-dark-600 transition-all cursor-pointer"
-                data-id="<%= video.id %>" data-title="<%= video.title %>" data-date="<%= video.upload_date %>"
-                data-size="<%= video.file_size %>" data-type="<%= mediaType %>"
-                onclick="playMedia('<%= video.id %>', '<%= video.title %>', '<%= mediaType %>')">
-                <div class="aspect-video relative overflow-hidden bg-dark-900">
-                  <% if (isAudio) { %>
-                    <div class="w-full h-full flex items-center justify-center bg-[#181818]">
-                      <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
-                        <i class="ti ti-music text-3xl text-primary"></i>
+        <!-- Folder + file grid view -->
+        <div id="gridView">
+          <!-- Folders row -->
+          <div id="folderGridContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-4"></div>
+          <!-- Files grid -->
+          <% if (videos && videos.length > 0) { %>
+            <div id="fileGridContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              <% videos.forEach(function(video) {
+                const isAudio = video.filepath && (video.filepath.includes('/audio/') ||
+                  video.filepath.endsWith('.m4a') || video.filepath.endsWith('.aac') || video.filepath.endsWith('.mp3'));
+                const mediaType = isAudio ? 'audio' : 'video'; %>
+                <div
+                  class="file-item group bg-dark-700 rounded-lg overflow-hidden border border-transparent hover:border-gray-600 hover:bg-dark-600 transition-all cursor-pointer relative"
+                  data-id="<%= video.id %>"
+                  data-title="<%= video.title %>"
+                  data-date="<%= video.upload_date %>"
+                  data-size="<%= video.file_size %>"
+                  data-type="<%= mediaType %>"
+                  data-folder="<%= video.folder_id || '' %>"
+                  onclick="handleFileClick(event, '<%= video.id %>', '<%= video.title %>', '<%= mediaType %>')">
+
+                  <!-- Checkbox -->
+                  <div class="absolute top-2 left-2 z-10 checkbox-wrapper opacity-0 group-hover:opacity-100 transition-opacity"
+                    onclick="event.stopPropagation()">
+                    <input type="checkbox" class="file-checkbox w-4 h-4 accent-primary cursor-pointer rounded"
+                      data-id="<%= video.id %>" data-title="<%= video.title %>"
+                      onchange="handleCheckboxChange(this)">
+                  </div>
+
+                  <div class="aspect-video relative overflow-hidden bg-dark-900">
+                    <% if (isAudio) { %>
+                      <div class="w-full h-full flex items-center justify-center bg-[#181818]">
+                        <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+                          <i class="ti ti-music text-3xl text-primary"></i>
+                        </div>
+                      </div>
+                    <% } else { %>
+                      <img src="<%= video.thumbnail_path %>" alt="<%= video.title %>" class="w-full h-full object-cover">
+                    <% } %>
+                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div class="bg-primary/90 w-10 h-10 rounded-full flex items-center justify-center">
+                        <i class="ti ti-player-play-filled text-white"></i>
                       </div>
                     </div>
-                    <% } else { %>
-                      <img src="<%= video.thumbnail_path %>" alt="<%= video.title %>"
-                        class="w-full h-full object-cover">
-                      <% } %>
-                        <div
-                          class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <div class="bg-primary/90 w-10 h-10 rounded-full flex items-center justify-center">
-                            <i class="ti ti-player-play-filled text-white"></i>
-                          </div>
-                        </div>
-                        <span class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-                          <%= formatDuration(video.duration) %>
-                        </span>
-                        <% if (isAudio) { %>
-                          <span class="absolute top-2 left-2 bg-primary/80 text-white text-xs px-1.5 py-0.5 rounded">
-                            <i class="ti ti-music text-xs mr-1"></i>Audio
-                          </span>
-                          <% } %>
-                </div>
-                <div class="p-3">
-                  <h3 class="font-medium text-sm truncate mb-1">
-                    <%= video.title %>
-                  </h3>
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs text-gray-400">
-                      <%= formatFileSize(video.file_size) %>
+                    <span class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+                      <%= formatDuration(video.duration) %>
                     </span>
-                    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button class="text-gray-400 hover:text-white p-1"
-                        onclick="event.stopPropagation(); showRenameDialog('<%= video.id %>', '<%= video.title %>')">
-                        <i class="ti ti-pencil text-sm"></i>
-                      </button>
-                      <button class="text-gray-400 hover:text-red-400 p-1"
-                        onclick="event.stopPropagation(); showDeleteDialog('<%= video.id %>', '<%= video.title %>')">
-                        <i class="ti ti-trash text-sm"></i>
-                      </button>
+                    <% if (isAudio) { %>
+                      <span class="absolute top-2 right-2 bg-primary/80 text-white text-xs px-1.5 py-0.5 rounded">
+                        <i class="ti ti-music text-xs mr-1"></i>Audio
+                      </span>
+                    <% } %>
+                  </div>
+                  <div class="p-3">
+                    <h3 class="font-medium text-sm truncate mb-1"><%= video.title %></h3>
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs text-gray-400"><%= formatFileSize(video.file_size) %></span>
+                      <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="text-gray-400 hover:text-blue-400 p-1" title="Move to folder"
+                          onclick="event.stopPropagation(); openMoveModal('<%= video.id %>', '<%= video.title %>', 'move')">
+                          <i class="ti ti-folder-symlink text-sm"></i>
+                        </button>
+                        <button class="text-gray-400 hover:text-green-400 p-1" title="Copy to folder"
+                          onclick="event.stopPropagation(); openMoveModal('<%= video.id %>', '<%= video.title %>', 'copy')">
+                          <i class="ti ti-copy text-sm"></i>
+                        </button>
+                        <button class="text-gray-400 hover:text-white p-1"
+                          onclick="event.stopPropagation(); showRenameDialog('<%= video.id %>', '<%= video.title %>')">
+                          <i class="ti ti-pencil text-sm"></i>
+                        </button>
+                        <button class="text-gray-400 hover:text-red-400 p-1"
+                          onclick="event.stopPropagation(); showDeleteDialog('<%= video.id %>', '<%= video.title %>')">
+                          <i class="ti ti-trash text-sm"></i>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
               <% }); %>
-          </div>
-
-          <div id="listView" class="hidden">
-            <div class="overflow-x-auto">
-              <table class="min-w-full">
-                <thead class="bg-gray-700">
-                  <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Name</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
-                      Duration</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">Size
-                    </th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">
-                      Modified</th>
-                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
-                      Actions</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-700">
-                  <% videos.forEach(function(video) { const isAudio=video.filepath &&
-                    (video.filepath.includes('/audio/') || video.filepath.endsWith('.m4a') ||
-                    video.filepath.endsWith('.aac') || video.filepath.endsWith('.mp3')); const mediaType=isAudio
-                    ? 'audio' : 'video' ; %>
-                    <tr class="file-item-row group hover:bg-dark-700 transition-colors cursor-pointer"
-                      data-id="<%= video.id %>" data-title="<%= video.title %>" data-date="<%= video.upload_date %>"
-                      data-size="<%= video.file_size %>" data-type="<%= mediaType %>"
-                      onclick="playMedia('<%= video.id %>', '<%= video.title %>', '<%= mediaType %>')">
-                      <td class="px-4 py-3">
-                        <div class="flex items-center gap-3">
-                          <div
-                            class="w-12 h-8 rounded overflow-hidden bg-[#181818] flex-shrink-0 relative flex items-center justify-center">
-                            <% if (isAudio) { %>
-                              <i class="ti ti-music text-primary"></i>
-                              <% } else { %>
-                                <img src="<%= video.thumbnail_path %>" alt="" class="w-full h-full object-cover">
-                                <% } %>
-                          </div>
-                          <div class="flex items-center gap-2">
-                            <span class="font-medium text-sm truncate max-w-xs">
-                              <%= video.title %>
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td class="px-4 py-3 text-sm text-gray-400">
-                        <%= formatDuration(video.duration) %>
-                      </td>
-                      <td class="px-4 py-3 text-sm text-gray-400">
-                        <%= formatFileSize(video.file_size) %>
-                      </td>
-                      <td class="px-4 py-3 text-sm text-gray-400">
-                        <%= new Date(video.upload_date).toLocaleDateString() %>
-                      </td>
-                      <td class="px-4 py-3 text-right">
-                        <div class="flex items-center justify-end gap-1">
-                          <button
-                            class="p-1.5 hover:bg-dark-600 rounded text-gray-400 hover:text-white transition-colors"
-                            onclick="event.stopPropagation(); showRenameDialog('<%= video.id %>', '<%= video.title %>')">
-                            <i class="ti ti-pencil text-sm"></i>
-                          </button>
-                          <button
-                            class="p-1.5 hover:bg-dark-600 rounded text-gray-400 hover:text-red-400 transition-colors"
-                            onclick="event.stopPropagation(); showDeleteDialog('<%= video.id %>', '<%= video.title %>')">
-                            <i class="ti ti-trash text-sm"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    <% }); %>
-                </tbody>
-              </table>
             </div>
-          </div>
           <% } else { %>
-            <div class="text-center py-12">
+            <div id="emptyState" class="text-center py-12">
               <div class="w-16 h-16 rounded-full bg-dark-700 flex items-center justify-center mx-auto mb-4">
                 <i class="ti ti-video text-gray-500 text-2xl"></i>
               </div>
@@ -245,17 +237,164 @@
                 <span>Upload Video</span>
               </button>
             </div>
-            <% } %>
+          <% } %>
+        </div>
+
+        <!-- List view -->
+        <div id="listView" class="hidden">
+          <!-- Folders list -->
+          <div id="folderListContainer" class="mb-2"></div>
+          <!-- Files list -->
+          <div class="overflow-x-auto">
+            <table class="min-w-full">
+              <thead class="bg-gray-700">
+                <tr>
+                  <th class="px-4 py-3 text-left w-8">
+                    <input type="checkbox" id="selectAllCheckbox" class="w-4 h-4 accent-primary cursor-pointer rounded"
+                      title="Select / Deselect All"
+                      onclick="this.checked ? selectAll() : clearSelection()">
+                  </th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Name</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">Duration</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">Size</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">Modified</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider w-32">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="fileListBody" class="divide-y divide-gray-700">
+                <% if (videos && videos.length > 0) { %>
+                  <% videos.forEach(function(video) {
+                    const isAudio = video.filepath && (video.filepath.includes('/audio/') ||
+                      video.filepath.endsWith('.m4a') || video.filepath.endsWith('.aac') || video.filepath.endsWith('.mp3'));
+                    const mediaType = isAudio ? 'audio' : 'video'; %>
+                    <tr class="file-item-row group hover:bg-dark-700 transition-colors cursor-pointer"
+                      data-id="<%= video.id %>"
+                      data-title="<%= video.title %>"
+                      data-date="<%= video.upload_date %>"
+                      data-size="<%= video.file_size %>"
+                      data-type="<%= mediaType %>"
+                      data-folder="<%= video.folder_id || '' %>"
+                      onclick="handleFileClick(event, '<%= video.id %>', '<%= video.title %>', '<%= mediaType %>')">
+                      <td class="px-4 py-3">
+                        <input type="checkbox" class="file-checkbox w-4 h-4 accent-primary cursor-pointer rounded"
+                          data-id="<%= video.id %>" data-title="<%= video.title %>">
+                      </td>
+                      <td class="px-4 py-3">
+                        <div class="flex items-center gap-3">
+                          <div class="w-12 h-8 rounded overflow-hidden bg-[#181818] flex-shrink-0 relative flex items-center justify-center">
+                            <% if (isAudio) { %>
+                              <i class="ti ti-music text-primary"></i>
+                            <% } else { %>
+                              <img src="<%= video.thumbnail_path %>" alt="" class="w-full h-full object-cover">
+                            <% } %>
+                          </div>
+                          <span class="font-medium text-sm truncate max-w-xs"><%= video.title %></span>
+                        </div>
+                      </td>
+                      <td class="px-4 py-3 text-sm text-gray-400"><%= formatDuration(video.duration) %></td>
+                      <td class="px-4 py-3 text-sm text-gray-400"><%= formatFileSize(video.file_size) %></td>
+                      <td class="px-4 py-3 text-sm text-gray-400"><%= new Date(video.upload_date).toLocaleDateString() %></td>
+                      <td class="px-4 py-3 text-right">
+                        <div class="flex items-center justify-end gap-1">
+                          <button class="p-1.5 hover:bg-dark-600 rounded text-gray-400 hover:text-blue-400 transition-colors" title="Move"
+                            onclick="event.stopPropagation(); openMoveModal('<%= video.id %>', '<%= video.title %>', 'move')">
+                            <i class="ti ti-folder-symlink text-sm"></i>
+                          </button>
+                          <button class="p-1.5 hover:bg-dark-600 rounded text-gray-400 hover:text-green-400 transition-colors" title="Copy"
+                            onclick="event.stopPropagation(); openMoveModal('<%= video.id %>', '<%= video.title %>', 'copy')">
+                            <i class="ti ti-copy text-sm"></i>
+                          </button>
+                          <button class="p-1.5 hover:bg-dark-600 rounded text-gray-400 hover:text-white transition-colors"
+                            onclick="event.stopPropagation(); showRenameDialog('<%= video.id %>', '<%= video.title %>')">
+                            <i class="ti ti-pencil text-sm"></i>
+                          </button>
+                          <button class="p-1.5 hover:bg-dark-600 rounded text-gray-400 hover:text-red-400 transition-colors"
+                            onclick="event.stopPropagation(); showDeleteDialog('<%= video.id %>', '<%= video.title %>')">
+                            <i class="ti ti-trash text-sm"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  <% }); %>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
-      <% if (videos && videos.length> 0) { %>
+      <% if (videos && videos.length > 0) { %>
         <div class="px-4 py-3 border-t border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p id="paginationInfo" class="text-sm text-gray-400">Showing 1-<%= Math.min(videos.length, 24) %> of <%=
-                videos.length %> videos</p>
+          <p id="paginationInfo" class="text-sm text-gray-400">Showing 1-<%= Math.min(videos.length, 24) %> of <%= videos.length %> videos</p>
           <div id="paginationControls" class="flex items-center gap-2"></div>
         </div>
-        <% } %>
+      <% } %>
     </div>
+
+    <!-- ==================== FOLDER MODALS ==================== -->
+
+    <!-- Create Folder Modal -->
+    <div id="createFolderModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+      <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-sm border border-gray-600/50">
+        <div class="flex items-center justify-between p-4 border-b border-gray-700">
+          <h3 class="text-lg font-semibold flex items-center gap-2"><i class="ti ti-folder-plus text-primary"></i> New Folder</h3>
+          <button onclick="closeCreateFolderModal()" class="text-gray-400 hover:text-white"><i class="ti ti-x text-xl"></i></button>
+        </div>
+        <div class="p-5">
+          <label class="block text-sm font-medium text-gray-300 mb-2">Folder Name</label>
+          <input type="text" id="newFolderName" placeholder="Enter folder name"
+            class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+        </div>
+        <div class="flex justify-end gap-3 p-4 border-t border-gray-700">
+          <button onclick="closeCreateFolderModal()" class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg transition-colors">Cancel</button>
+          <button onclick="createFolder()" class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors">Create</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rename Folder Modal -->
+    <div id="renameFolderModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+      <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-sm border border-gray-600/50">
+        <div class="flex items-center justify-between p-4 border-b border-gray-700">
+          <h3 class="text-lg font-semibold flex items-center gap-2"><i class="ti ti-pencil text-primary"></i> Rename Folder</h3>
+          <button onclick="closeRenameFolderModal()" class="text-gray-400 hover:text-white"><i class="ti ti-x text-xl"></i></button>
+        </div>
+        <div class="p-5">
+          <input type="hidden" id="renameFolderId">
+          <label class="block text-sm font-medium text-gray-300 mb-2">New Name</label>
+          <input type="text" id="renameFolderName" placeholder="Enter new folder name"
+            class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+        </div>
+        <div class="flex justify-end gap-3 p-4 border-t border-gray-700">
+          <button onclick="closeRenameFolderModal()" class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg transition-colors">Cancel</button>
+          <button onclick="renameFolder()" class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors">Rename</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Move / Copy Modal -->
+    <div id="moveModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+      <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-sm border border-gray-600/50">
+        <div class="flex items-center justify-between p-4 border-b border-gray-700">
+          <h3 id="moveModalTitle" class="text-lg font-semibold"></h3>
+          <button onclick="closeMoveModal()" class="text-gray-400 hover:text-white"><i class="ti ti-x text-xl"></i></button>
+        </div>
+        <div class="p-5">
+          <input type="hidden" id="moveFileId">
+          <input type="hidden" id="moveAction">
+          <p class="text-sm text-gray-400 mb-3">Select destination folder:</p>
+          <div id="folderPickerList" class="space-y-2 max-h-60 overflow-y-auto">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 p-4 border-t border-gray-700">
+          <button onclick="closeMoveModal()" class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg transition-colors">Cancel</button>
+          <button onclick="confirmMoveFile()" id="moveConfirmBtn" class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== ORIGINAL MODALS ==================== -->
 
     <div id="uploadModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden modal-overlay overflow-y-auto">
       <div class="flex min-h-screen items-center justify-center p-4">
@@ -300,8 +439,7 @@
                       accept="video/mp4,video/avi,video/quicktime,video/x-matroska,video/webm,video/x-flv,video/x-ms-wmv,video/x-m4v,video/mpeg,video/mp2t,application/octet-stream"
                       multiple class="hidden" id="mediaFileInput">
                   </label>
-                  <p id="dropzoneFormats" class="text-gray-500 text-xs">Supported formats: MP4, AVI, MOV, and more (max
-                    50GB)</p>
+                  <p id="dropzoneFormats" class="text-gray-500 text-xs">Supported formats: MP4, AVI, MOV, and more (max 50GB)</p>
                 </div>
               </div>
               <div id="selectedFileInfo" class="hidden">
@@ -333,8 +471,7 @@
                   <span id="uploadProgressPercent" class="text-primary font-medium">0%</span>
                 </div>
                 <div class="w-full bg-dark-700 rounded-full h-2.5">
-                  <div id="uploadProgressBar" class="bg-primary h-2.5 rounded-full transition-all duration-300"
-                    style="width: 0%"></div>
+                  <div id="uploadProgressBar" class="bg-primary h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
                 </div>
                 <div id="uploadFilesList" class="mt-3 space-y-2 max-h-48 overflow-y-auto"></div>
               </div>
@@ -353,8 +490,7 @@
       </div>
     </div>
 
-    <div id="cloudImportModal"
-      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden modal-overlay overflow-y-auto">
+    <div id="cloudImportModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden modal-overlay overflow-y-auto">
       <div class="flex min-h-screen items-center justify-center p-4">
         <div id="cloudModalContent" class="bg-dark-800 rounded-lg shadow-xl w-full max-w-md">
           <div class="flex items-center justify-between p-4 border-b border-gray-700">
@@ -374,18 +510,32 @@
       <span id="toast-message"></span>
     </div>
 
-
     <script>
+      // ============================================================
+      // STATE
+      // ============================================================
       let currentView = 'grid';
       let currentUploadType = 'video';
-      // Server physical disk space (bytes)
       let serverDiskFree = Infinity;
       let serverDiskTotal = Infinity;
       let serverDiskUsed = 0;
-      const DISK_SAFETY_BUFFER = 100 * 1024 * 1024; // 100 MB safety buffer
+      const DISK_SAFETY_BUFFER = 100 * 1024 * 1024;
+
+      // Folder state
+      let allFolders = [];          // { id, name, parent_id }
+      let currentFolderId = null;   // null = root
+      let folderPath = [];          // breadcrumb stack: [{id, name}]
+      let selectedMoveTarget = null; // folder id chosen in move modal
+
+      // Selection state
+      let selectedFileIds = new Set();
 
       loadDiskUsage();
+      loadFolders();
 
+      // ============================================================
+      // DISK USAGE
+      // ============================================================
       async function loadDiskUsage() {
         try {
           const response = await fetch('/api/system/disk-space');
@@ -396,9 +546,7 @@
             serverDiskUsed = data.used;
             updateDiskUsageDisplay();
           }
-        } catch (error) {
-          console.error('Error loading disk space:', error);
-        }
+        } catch (error) { console.error('Error loading disk space:', error); }
       }
 
       function updateDiskUsageDisplay() {
@@ -406,40 +554,19 @@
         const textDesktop = document.getElementById('diskUsageTextDesktop');
         const infoMobile = document.getElementById('diskUsageInfoMobile');
         const textMobile = document.getElementById('diskUsageTextMobile');
-
-        // Only show if we have real data (not the Infinity fallback)
         if (serverDiskTotal !== Infinity) {
-          const freeText = formatFileSize(serverDiskFree);
-          const totalText = formatFileSize(serverDiskTotal);
-          const displayText = `${freeText} free / ${totalText}`;
-
+          const displayText = `${formatFileSize(serverDiskUsed)} / ${formatFileSize(serverDiskTotal)} (${formatFileSize(serverDiskFree)} free)`;
           textDesktop.textContent = displayText;
           textMobile.textContent = displayText;
-
           const isMobile = window.innerWidth < 768;
-          if (isMobile) {
-            infoDesktop.classList.add('hidden');
-            infoMobile.classList.remove('hidden');
-          } else {
-            infoDesktop.classList.remove('hidden');
-            infoMobile.classList.add('hidden');
-          }
-        } else {
-          infoDesktop.classList.add('hidden');
-          infoMobile.classList.add('hidden');
-        }
+          if (isMobile) { infoDesktop.classList.add('hidden'); infoMobile.classList.remove('hidden'); }
+          else { infoDesktop.classList.remove('hidden'); infoMobile.classList.add('hidden'); }
+        } else { infoDesktop.classList.add('hidden'); infoMobile.classList.add('hidden'); }
       }
-
       window.addEventListener('resize', updateDiskUsageDisplay);
 
-      // Returns true if server has enough free space for this file
-      function checkDiskLimit(fileSize) {
-        return serverDiskFree >= (fileSize + DISK_SAFETY_BUFFER);
-      }
-
-      function getRemainingSpace() {
-        return Math.max(0, serverDiskFree - DISK_SAFETY_BUFFER);
-      }
+      function checkDiskLimit(fileSize) { return serverDiskFree >= (fileSize + DISK_SAFETY_BUFFER); }
+      function getRemainingSpace() { return Math.max(0, serverDiskFree - DISK_SAFETY_BUFFER); }
 
       function formatFileSize(bytes) {
         if (bytes === 0) return '0 B';
@@ -449,59 +576,604 @@
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
       }
 
-      function switchUploadTab(type) {
-        currentUploadType = type;
-        document.getElementById('uploadType').value = type;
-        const tabVideo = document.getElementById('tabVideo');
-        const tabAudio = document.getElementById('tabAudio');
-        const dropzoneIcon = document.getElementById('dropzoneIcon');
-        const dropzoneText = document.getElementById('dropzoneText');
-        const dropzoneFormats = document.getElementById('dropzoneFormats');
-        const mediaFileInput = document.getElementById('mediaFileInput');
-
-        if (type === 'video') {
-          tabVideo.className = 'flex-1 py-2 px-4 rounded-lg bg-primary text-white transition-colors';
-          tabAudio.className = 'flex-1 py-2 px-4 rounded-lg bg-dark-700 text-gray-400 hover:text-white transition-colors';
-          dropzoneIcon.className = 'ti ti-video text-2xl text-gray-400';
-          dropzoneText.textContent = 'Drag and drop video files here';
-          dropzoneFormats.textContent = 'Supported formats: MP4, AVI, MOV, and more (max 50GB)';
-          mediaFileInput.accept = 'video/mp4,video/avi,video/quicktime,video/x-matroska,video/webm,video/x-flv,video/x-ms-wmv,video/x-m4v,video/mpeg,video/mp2t,application/octet-stream';
-        } else {
-          tabVideo.className = 'flex-1 py-2 px-4 rounded-lg bg-dark-700 text-gray-400 hover:text-white transition-colors';
-          tabAudio.className = 'flex-1 py-2 px-4 rounded-lg bg-primary text-white transition-colors';
-          dropzoneIcon.className = 'ti ti-music text-2xl text-gray-400';
-          dropzoneText.textContent = 'Drag and drop audio files here';
-          dropzoneFormats.textContent = 'Supported formats: MP3, WAC, AAC, and more';
-          mediaFileInput.accept = 'audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/aac,audio/mp4,audio/x-m4a,audio/ogg,audio/flac';
-        }
-        resetUploadForm();
-      }
-
+      // ============================================================
+      // TOAST
+      // ============================================================
       function showToast(type, message) {
         const toast = document.getElementById('toast');
         const toastIcon = document.getElementById('toast-icon');
         const toastMessage = document.getElementById('toast-message');
         if (type === 'success') {
           toastIcon.className = 'ti ti-check text-green-400 text-xl mr-2 font-loaded';
-          toast.classList.add('border-l-4', 'border-green-400');
-          toast.classList.remove('border-l-4', 'border-red-400', 'border-yellow-400');
+          toast.className = 'fixed top-16 right-4 bg-dark-800 text-white px-4 py-3 rounded-lg shadow-lg z-50 flex items-center border-l-4 border-green-400';
         } else if (type === 'error') {
           toastIcon.className = 'ti ti-x text-red-400 text-xl mr-2 font-loaded';
-          toast.classList.add('border-l-4', 'border-red-400');
-          toast.classList.remove('border-l-4', 'border-green-400', 'border-yellow-400');
+          toast.className = 'fixed top-16 right-4 bg-dark-800 text-white px-4 py-3 rounded-lg shadow-lg z-50 flex items-center border-l-4 border-red-400';
         } else if (type === 'warning') {
           toastIcon.className = 'ti ti-alert-triangle text-yellow-400 text-xl mr-2 font-loaded';
-          toast.classList.add('border-l-4', 'border-yellow-400');
-          toast.classList.remove('border-l-4', 'border-green-400', 'border-red-400');
+          toast.className = 'fixed top-16 right-4 bg-dark-800 text-white px-4 py-3 rounded-lg shadow-lg z-50 flex items-center border-l-4 border-yellow-400';
         }
         toastMessage.textContent = message;
         toast.classList.remove('hidden');
         setTimeout(() => toast.classList.add('hidden'), 3000);
       }
 
+      // ============================================================
+      // FOLDER API CALLS
+      // ============================================================
+      async function loadFolders() {
+        try {
+          const res = await fetch('/api/folders');
+          const data = await res.json();
+          if (data.success) {
+            allFolders = data.folders || [];
+            renderFolders();
+            renderBreadcrumb();
+          }
+        } catch (e) { console.error('Error loading folders:', e); }
+      }
+
+      // Folders visible in current level
+      function getCurrentFolders() {
+        return allFolders.filter(f => (f.parent_id || null) === currentFolderId);
+      }
+
+      function renderFolders() {
+        const folders = getCurrentFolders();
+        renderFolderGrid(folders);
+        renderFolderList(folders);
+        renderCurrentFiles();
+      }
+
+      function renderFolderGrid(folders) {
+        const container = document.getElementById('folderGridContainer');
+        container.innerHTML = '';
+        // Back button when inside a folder
+        if (currentFolderId !== null) {
+          const back = document.createElement('div');
+          back.className = 'group bg-dark-700 rounded-lg overflow-hidden border border-transparent hover:border-gray-600 hover:bg-dark-600 transition-all cursor-pointer flex flex-col items-center justify-center p-4 aspect-video';
+          back.innerHTML = `<i class="ti ti-arrow-back-up text-2xl text-gray-400 group-hover:text-white transition-colors mb-2"></i><span class="text-xs text-gray-400 group-hover:text-white">..</span>`;
+          back.onclick = () => navigateUp();
+          container.appendChild(back);
+        }
+        folders.forEach(folder => container.appendChild(createFolderCard(folder)));
+      }
+
+      function renderFolderList(folders) {
+        const container = document.getElementById('folderListContainer');
+        container.innerHTML = '';
+        if (currentFolderId !== null) {
+          const backRow = document.createElement('div');
+          backRow.className = 'flex items-center gap-3 px-4 py-2 hover:bg-dark-700 rounded-lg cursor-pointer text-gray-400 hover:text-white transition-colors mb-1';
+          backRow.innerHTML = `<i class="ti ti-arrow-back-up"></i><span class="text-sm">..</span>`;
+          backRow.onclick = () => navigateUp();
+          container.appendChild(backRow);
+        }
+        folders.forEach(folder => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between px-4 py-2 hover:bg-dark-700 rounded-lg cursor-pointer group mb-1';
+          row.innerHTML = `
+            <div class="flex items-center gap-3" onclick="navigateToFolder('${folder.id}')">
+              <i class="ti ti-folder text-yellow-400 text-xl"></i>
+              <span class="text-sm font-medium">${folder.name}</span>
+            </div>
+            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button class="p-1.5 hover:bg-dark-600 rounded text-gray-400 hover:text-white transition-colors" title="Rename"
+                onclick="event.stopPropagation(); openRenameFolderModal('${folder.id}', '${folder.name.replace(/'/g,"\\'")}')">
+                <i class="ti ti-pencil text-sm"></i>
+              </button>
+              <button class="p-1.5 hover:bg-dark-600 rounded text-gray-400 hover:text-red-400 transition-colors" title="Delete folder"
+                onclick="event.stopPropagation(); confirmDeleteFolder('${folder.id}', '${folder.name.replace(/'/g,"\\'")}')">
+                <i class="ti ti-trash text-sm"></i>
+              </button>
+            </div>
+          `;
+          container.appendChild(row);
+        });
+      }
+
+      function createFolderCard(folder) {
+        const card = document.createElement('div');
+        card.className = 'group bg-dark-700 rounded-lg overflow-hidden border border-transparent hover:border-yellow-500/40 hover:bg-dark-600 transition-all cursor-pointer relative';
+        card.innerHTML = `
+          <div class="aspect-video flex items-center justify-center bg-dark-900 relative">
+            <i class="ti ti-folder text-yellow-400 text-5xl group-hover:text-yellow-300 transition-colors"></i>
+            <!-- folder action buttons -->
+            <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button class="w-6 h-6 flex items-center justify-center bg-dark-700/90 rounded text-gray-300 hover:text-white hover:bg-dark-600 transition-colors" title="Rename"
+                onclick="event.stopPropagation(); openRenameFolderModal('${folder.id}', '${folder.name.replace(/'/g,"\\'")}')">
+                <i class="ti ti-pencil text-xs"></i>
+              </button>
+              <button class="w-6 h-6 flex items-center justify-center bg-dark-700/90 rounded text-gray-300 hover:text-red-400 hover:bg-dark-600 transition-colors" title="Delete"
+                onclick="event.stopPropagation(); confirmDeleteFolder('${folder.id}', '${folder.name.replace(/'/g,"\\'")}')">
+                <i class="ti ti-trash text-xs"></i>
+              </button>
+            </div>
+          </div>
+          <div class="p-3">
+            <h3 class="font-medium text-sm truncate">${folder.name}</h3>
+            <p class="text-xs text-gray-400 mt-0.5">Folder</p>
+          </div>
+        `;
+        card.addEventListener('click', () => navigateToFolder(folder.id));
+        return card;
+      }
+
+      // Show/hide file items based on current folder
+      function renderCurrentFiles() {
+        const allGridItems = document.querySelectorAll('.file-item');
+        const allListItems = document.querySelectorAll('.file-item-row');
+        allGridItems.forEach(item => {
+          const itemFolder = item.dataset.folder || '';
+          const match = currentFolderId === null ? itemFolder === '' : itemFolder === String(currentFolderId);
+          item.style.display = match ? '' : 'none';
+        });
+        allListItems.forEach(item => {
+          const itemFolder = item.dataset.folder || '';
+          const match = currentFolderId === null ? itemFolder === '' : itemFolder === String(currentFolderId);
+          item.style.display = match ? '' : 'none';
+        });
+        // Rerun pagination/filter
+        filterAndSort();
+      }
+
+      // ============================================================
+      // NAVIGATION
+      // ============================================================
+      function navigateToFolder(folderId) {
+        if (folderId === null) {
+          currentFolderId = null;
+          folderPath = [];
+        } else {
+          const folder = allFolders.find(f => f.id === folderId || f.id === String(folderId));
+          if (!folder) return;
+          // Check if already in path (going back to ancestor)
+          const idx = folderPath.findIndex(p => String(p.id) === String(folderId));
+          if (idx >= 0) {
+            folderPath = folderPath.slice(0, idx + 1);
+          } else {
+            folderPath.push({ id: folder.id, name: folder.name });
+          }
+          currentFolderId = folderId;
+        }
+        renderBreadcrumb();
+        renderFolders();
+      }
+
+      function navigateUp() {
+        if (folderPath.length === 0) return;
+        folderPath.pop();
+        currentFolderId = folderPath.length > 0 ? folderPath[folderPath.length - 1].id : null;
+        renderBreadcrumb();
+        renderFolders();
+      }
+
+      function renderBreadcrumb() {
+        const bc = document.getElementById('breadcrumb');
+        // Keep first root button, rebuild the rest
+        bc.innerHTML = `
+          <button onclick="navigateToFolder(null)" class="hover:text-white transition-colors flex items-center gap-1">
+            <i class="ti ti-home text-xs"></i><span>Root</span>
+          </button>
+        `;
+        folderPath.forEach((seg, i) => {
+          const sep = document.createElement('span');
+          sep.className = 'text-gray-600';
+          sep.textContent = '/';
+          bc.appendChild(sep);
+          const btn = document.createElement('button');
+          btn.className = i === folderPath.length - 1
+            ? 'text-white font-medium'
+            : 'hover:text-white transition-colors';
+          btn.textContent = seg.name;
+          btn.onclick = () => navigateToFolder(seg.id);
+          bc.appendChild(btn);
+        });
+      }
+
+      // ============================================================
+      // CREATE FOLDER
+      // ============================================================
+      function openCreateFolderModal() {
+        document.getElementById('newFolderName').value = '';
+        const modal = document.getElementById('createFolderModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => document.getElementById('newFolderName').focus(), 100);
+      }
+      function closeCreateFolderModal() {
+        const modal = document.getElementById('createFolderModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+      document.getElementById('newFolderName').addEventListener('keydown', e => { if (e.key === 'Enter') createFolder(); });
+
+      async function createFolder() {
+        const name = document.getElementById('newFolderName').value.trim();
+        if (!name) { showToast('error', 'Please enter a folder name'); return; }
+        try {
+          const res = await fetch('/api/folders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, parent_id: currentFolderId })
+          });
+          const data = await res.json();
+          if (data.success) {
+            allFolders.push(data.folder);
+            closeCreateFolderModal();
+            renderFolders();
+            showToast('success', `Folder "${name}" created`);
+          } else {
+            showToast('error', data.error || 'Failed to create folder');
+          }
+        } catch (e) {
+          showToast('error', 'Error creating folder');
+        }
+      }
+
+      // ============================================================
+      // RENAME FOLDER
+      // ============================================================
+      function openRenameFolderModal(folderId, currentName) {
+        document.getElementById('renameFolderId').value = folderId;
+        document.getElementById('renameFolderName').value = currentName;
+        const modal = document.getElementById('renameFolderModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => {
+          const inp = document.getElementById('renameFolderName');
+          inp.focus(); inp.select();
+        }, 100);
+      }
+      function closeRenameFolderModal() {
+        const modal = document.getElementById('renameFolderModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+      document.getElementById('renameFolderName').addEventListener('keydown', e => { if (e.key === 'Enter') renameFolder(); });
+
+      async function renameFolder() {
+        const folderId = document.getElementById('renameFolderId').value;
+        const name = document.getElementById('renameFolderName').value.trim();
+        if (!name) { showToast('error', 'Please enter a folder name'); return; }
+        try {
+          const res = await fetch(`/api/folders/${folderId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+          });
+          const data = await res.json();
+          if (data.success) {
+            const f = allFolders.find(x => String(x.id) === String(folderId));
+            if (f) f.name = name;
+            // Update breadcrumb if in path
+            const seg = folderPath.find(p => String(p.id) === String(folderId));
+            if (seg) seg.name = name;
+            closeRenameFolderModal();
+            renderFolders();
+            renderBreadcrumb();
+            showToast('success', 'Folder renamed');
+          } else {
+            showToast('error', data.error || 'Failed to rename folder');
+          }
+        } catch (e) {
+          showToast('error', 'Error renaming folder');
+        }
+      }
+
+      // ============================================================
+      // DELETE FOLDER
+      // ============================================================
+      async function confirmDeleteFolder(folderId, folderName) {
+        const result = await createModalDialog({
+          type: 'danger',
+          icon: 'ti-trash',
+          title: 'Delete Folder',
+          message: `Delete folder "${folderName}" and ALL its contents? This cannot be undone.`,
+          confirmText: 'Delete',
+          confirmClass: 'bg-red-500 hover:bg-red-600'
+        });
+        if (!result.confirmed) return;
+        try {
+          const res = await fetch(`/api/folders/${folderId}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (data.success) {
+            allFolders = allFolders.filter(f => String(f.id) !== String(folderId));
+            // If we were inside this folder, go back to root
+            if (String(currentFolderId) === String(folderId)) {
+              currentFolderId = null;
+              folderPath = [];
+              renderBreadcrumb();
+            }
+            renderFolders();
+            showToast('success', `Folder "${folderName}" deleted`);
+            setTimeout(() => window.location.reload(), 1000);
+          } else {
+            showToast('error', data.error || 'Failed to delete folder');
+          }
+        } catch (e) {
+          showToast('error', 'Error deleting folder');
+        }
+      }
+
+      // ============================================================
+      // MOVE / COPY FILE
+      // ============================================================
+      function openMoveModal(fileId, fileTitle, action) {
+        document.getElementById('moveFileId').value = fileId;
+        document.getElementById('moveAction').value = action;
+        document.getElementById('moveModalTitle').innerHTML =
+          action === 'move'
+            ? `<i class="ti ti-folder-symlink text-primary mr-2"></i>Move: ${fileTitle}`
+            : `<i class="ti ti-copy text-green-400 mr-2"></i>Copy: ${fileTitle}`;
+        selectedMoveTarget = undefined; // undefined = belum dipilih
+
+        const list = document.getElementById('folderPickerList');
+        list.innerHTML = '';
+
+        // Root option
+        const rootOpt = createFolderOption(null, '/ Root');
+        list.appendChild(rootOpt);
+
+        // All folders (flat list, indented by depth)
+        function addFolderOptions(parentId, depth) {
+          allFolders.filter(f => (f.parent_id || null) === parentId).forEach(f => {
+            list.appendChild(createFolderOption(f.id, f.name, depth));
+            addFolderOptions(f.id, depth + 1);
+          });
+        }
+        addFolderOptions(null, 0);
+
+        const modal = document.getElementById('moveModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+
+      function createFolderOption(folderId, name, depth = 0) {
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-dark-600 transition-colors border border-transparent';
+        div.style.paddingLeft = `${12 + depth * 16}px`;
+        div.dataset.folderId = folderId === null ? '' : folderId;
+        div.innerHTML = `
+          <i class="ti ${folderId === null ? 'ti-home' : 'ti-folder'} ${folderId === null ? 'text-gray-400' : 'text-yellow-400'} text-sm"></i>
+          <span class="text-sm">${name}</span>
+        `;
+        div.addEventListener('click', () => {
+          document.querySelectorAll('#folderPickerList > div').forEach(d => {
+            d.classList.remove('border-primary', 'bg-primary/10');
+            d.classList.add('border-transparent');
+          });
+          div.classList.add('border-primary', 'bg-primary/10');
+          div.classList.remove('border-transparent');
+          selectedMoveTarget = folderId;
+        });
+        return div;
+      }
+
+      function closeMoveModal() {
+        const modal = document.getElementById('moveModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        // undefined = belum dipilih, null = root (valid), <id> = folder tertentu (valid)
+        selectedMoveTarget = undefined;
+        // Reset ke handler single-file
+        document.getElementById('moveConfirmBtn').onclick = confirmMoveFile;
+      }
+
+      async function confirmMoveFile() {
+        if (selectedMoveTarget === undefined) {
+          showToast('error', 'Please select a destination folder'); return;
+        }
+
+        // Capture dulu sebelum closeMoveModal() me-reset selectedMoveTarget
+        const targetFolderId = selectedMoveTarget;
+        const fileId = document.getElementById('moveFileId').value;
+        const action = document.getElementById('moveAction').value;
+        const endpoint = action === 'move' ? `/api/videos/${fileId}/move` : `/api/videos/${fileId}/copy`;
+
+        closeMoveModal();
+
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder_id: targetFolderId })
+          });
+          const data = await res.json();
+          if (data.success) {
+            showToast('success', action === 'move' ? 'File moved successfully' : 'File copied successfully');
+            setTimeout(() => window.location.reload(), 1000);
+          } else {
+            showToast('error', data.error || `Failed to ${action} file`);
+          }
+        } catch (e) {
+          showToast('error', `Error during ${action}`);
+        }
+      }
+
+      // ============================================================
+      // CHECKBOX & BULK DELETE
+      // ============================================================
+      function handleFileClick(event, fileId, fileTitle, mediaType) {
+        // If clicked on a checkbox or button, don't play
+        if (event.target.closest('.checkbox-wrapper') || event.target.closest('button')) return;
+        playMedia(fileId, fileTitle, mediaType);
+      }
+
+      function handleCheckboxChange(checkbox) {
+        const fileId = checkbox.dataset.id;
+        const isChecked = checkbox.checked;
+        // Sync pasangan checkbox (grid ↔ list) dengan data-id sama
+        document.querySelectorAll(`.file-checkbox[data-id="${fileId}"]`).forEach(cb => {
+          cb.checked = isChecked;
+          const card = cb.closest('.file-item') || cb.closest('.file-item-row');
+          if (isChecked) {
+            if (card) card.classList.add('ring-2', 'ring-primary');
+            const wrapper = cb.closest('.checkbox-wrapper');
+            if (wrapper) wrapper.style.opacity = '1';
+          } else {
+            if (card) card.classList.remove('ring-2', 'ring-primary');
+            const wrapper = cb.closest('.checkbox-wrapper');
+            if (wrapper) wrapper.style.opacity = '';
+          }
+        });
+        if (isChecked) selectedFileIds.add(fileId);
+        else selectedFileIds.delete(fileId);
+        updateBulkBar();
+      }
+
+      function selectAll() {
+        document.querySelectorAll('.file-item, .file-item-row').forEach(card => {
+          // Hanya item yang visible (tidak di-hide oleh pagination/filter)
+          if (card.style.display === 'none') return;
+          const cb = card.querySelector('.file-checkbox');
+          if (!cb || cb.checked) return;
+          cb.checked = true;
+          handleCheckboxChange(cb);
+        });
+      }
+
+      function updateBulkBar() {
+        const bar = document.getElementById('bulkActionBar');
+        const countEl = document.getElementById('selectedCount');
+        const selectAllCb = document.getElementById('selectAllCheckbox');
+        if (selectedFileIds.size > 0) {
+          bar.classList.remove('hidden');
+          bar.classList.add('flex');
+          countEl.textContent = `${selectedFileIds.size} selected`;
+          if (selectAllCb) selectAllCb.checked = true;
+        } else {
+          bar.classList.add('hidden');
+          bar.classList.remove('flex');
+          if (selectAllCb) selectAllCb.checked = false;
+        }
+      }
+
+      function clearSelection() {
+        selectedFileIds.clear();
+        document.querySelectorAll('.file-checkbox').forEach(cb => {
+          cb.checked = false;
+          const card = cb.closest('.file-item') || cb.closest('.file-item-row');
+          if (card) card.classList.remove('ring-2', 'ring-primary');
+          const wrapper = cb.closest('.checkbox-wrapper');
+          if (wrapper) wrapper.style.opacity = '';
+        });
+        const selectAllCb = document.getElementById('selectAllCheckbox');
+        if (selectAllCb) selectAllCb.checked = false;
+        updateBulkBar();
+      }
+
+      async function deleteSelected() {
+        if (selectedFileIds.size === 0) return;
+        const count = selectedFileIds.size;
+        const result = await createModalDialog({
+          type: 'danger',
+          icon: 'ti-trash',
+          title: 'Delete Selected Files',
+          message: `Delete ${count} selected file${count > 1 ? 's' : ''}? This action cannot be undone.`,
+          confirmText: 'Delete All',
+          confirmClass: 'bg-red-500 hover:bg-red-600'
+        });
+        if (!result.confirmed) return;
+
+        let successCount = 0;
+        let failCount = 0;
+        for (const fileId of selectedFileIds) {
+          try {
+            const res = await fetch(`/api/videos/${fileId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) successCount++;
+            else failCount++;
+          } catch (e) { failCount++; }
+        }
+
+        if (failCount === 0) showToast('success', `${successCount} file${successCount > 1 ? 's' : ''} deleted`);
+        else showToast('warning', `${successCount} deleted, ${failCount} failed`);
+        setTimeout(() => window.location.reload(), 1000);
+      }
+
+      // ============================================================
+      // BULK MOVE / COPY SELECTED
+      // ============================================================
+
+      function bulkMoveSelected() {
+        if (selectedFileIds.size === 0) return;
+        _openBulkFolderPicker('move');
+      }
+
+      function bulkCopySelected() {
+        if (selectedFileIds.size === 0) return;
+        _openBulkFolderPicker('copy');
+      }
+
+      /**
+       * Reuse openMoveModal dengan file pertama sebagai "dummy" agar
+       * folder picker ter-render identik, lalu override judul + confirm handler.
+       */
+      function _openBulkFolderPicker(action) {
+        const count = selectedFileIds.size;
+        const firstId = [...selectedFileIds][0];
+
+        // Pakai openMoveModal yang sudah terbukti jalan
+        openMoveModal(firstId, `${count} file${count > 1 ? 's' : ''}`, action);
+
+        // Override judul setelah modal dibuka
+        const isCopy = action === 'copy';
+        document.getElementById('moveModalTitle').innerHTML = isCopy
+          ? `<i class="ti ti-copy text-green-400 mr-2"></i>Copy ${count} file${count > 1 ? 's' : ''} to...`
+          : `<i class="ti ti-folder-symlink text-primary mr-2"></i>Move ${count} file${count > 1 ? 's' : ''} to...`;
+
+        // Override confirm button ke handler bulk
+        document.getElementById('moveConfirmBtn').onclick = () => _executeBulkAction(action);
+      }
+
+      async function _executeBulkAction(action) {
+        if (selectedMoveTarget === undefined) {
+          showToast('error', 'Please select a destination folder');
+          return;
+        }
+
+        // Capture dulu sebelum closeMoveModal() me-reset selectedMoveTarget
+        const targetFolderId = selectedMoveTarget;
+        const ids = [...selectedFileIds];
+        const count = ids.length;
+        const verb = action === 'move' ? 'moved' : 'copied';
+
+        closeMoveModal();
+        showToast('warning', `Processing ${count} file${count > 1 ? 's' : ''}...`);
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const fileId of ids) {
+          try {
+            const res = await fetch(`/api/videos/${fileId}/${action}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ folder_id: targetFolderId })
+            });
+            const data = await res.json();
+            if (data.success) successCount++;
+            else failCount++;
+          } catch (e) { failCount++; }
+        }
+
+        if (failCount === 0) {
+          showToast('success', `${successCount} file${successCount > 1 ? 's' : ''} ${verb} successfully`);
+        } else {
+          showToast('warning', `${successCount} ${verb}, ${failCount} failed`);
+        }
+
+        setTimeout(() => window.location.reload(), 1000);
+      }
+
+      // ============================================================
+      // VIEW TOGGLE
+      // ============================================================
       document.getElementById('gridViewBtn').addEventListener('click', function () {
         currentView = 'grid';
         document.getElementById('gridView').classList.remove('hidden');
+        document.getElementById('selectAllBtn').classList.remove('hidden');
         document.getElementById('listView').classList.add('hidden');
         this.classList.add('bg-primary', 'text-white');
         this.classList.remove('text-gray-400');
@@ -513,64 +1185,58 @@
         currentView = 'list';
         document.getElementById('listView').classList.remove('hidden');
         document.getElementById('gridView').classList.add('hidden');
+        document.getElementById('selectAllBtn').classList.add('hidden');
         this.classList.add('bg-primary', 'text-white');
         this.classList.remove('text-gray-400');
         document.getElementById('gridViewBtn').classList.remove('bg-primary', 'text-white');
         document.getElementById('gridViewBtn').classList.add('text-gray-400');
       });
 
+      // ============================================================
+      // MEDIA PLAYER
+      // ============================================================
       function playMedia(mediaId, mediaTitle, mediaType) {
         const modal = document.createElement('div');
         modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4';
         modal.id = 'media-player-modal';
-
         if (mediaType === 'audio') {
           modal.innerHTML = `
-      <div class="relative w-full max-w-lg mx-auto">
-        <div class="bg-dark-800 rounded-lg overflow-hidden shadow-xl">
-          <div class="flex items-center justify-between p-4 border-b border-gray-700">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                <i class="ti ti-music text-primary"></i>
+            <div class="relative w-full max-w-lg mx-auto">
+              <div class="bg-dark-800 rounded-lg overflow-hidden shadow-xl">
+                <div class="flex items-center justify-between p-4 border-b border-gray-700">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                      <i class="ti ti-music text-primary"></i>
+                    </div>
+                    <h3 class="text-lg font-medium truncate pr-4">${mediaTitle || 'Now Playing'}</h3>
+                  </div>
+                  <button id="close-player-btn" class="text-gray-400 hover:text-white"><i class="ti ti-x text-xl"></i></button>
+                </div>
+                <div class="p-6">
+                  <audio id="audio-player" class="w-full" controls autoplay>
+                    <source src="/stream/${mediaId}" type="audio/mp4">
+                  </audio>
+                </div>
               </div>
-              <h3 class="text-lg font-medium truncate pr-4">${mediaTitle || 'Now Playing'}</h3>
-            </div>
-            <button id="close-player-btn" class="text-gray-400 hover:text-white">
-              <i class="ti ti-x text-xl"></i>
-            </button>
-          </div>
-          <div class="p-6">
-            <audio id="audio-player" class="w-full" controls autoplay>
-              <source src="/stream/${mediaId}" type="audio/mp4">
-              Your browser does not support the audio element.
-            </audio>
-          </div>
-        </div>
-      </div>
-    `;
+            </div>`;
         } else {
           modal.innerHTML = `
-      <div class="relative w-full max-w-4xl mx-auto">
-        <div class="bg-dark-800 rounded-lg overflow-hidden shadow-xl">
-          <div class="flex items-center justify-between p-4 border-b border-gray-700">
-            <h3 class="text-lg font-medium truncate pr-4">${mediaTitle || 'Now Playing'}</h3>
-            <button id="close-player-btn" class="text-gray-400 hover:text-white">
-              <i class="ti ti-x text-xl"></i>
-            </button>
-          </div>
-          <div class="bg-black aspect-video">
-            <video id="native-player" class="w-full h-full" controls preload="auto" autoplay>
-              <source src="/stream/${mediaId}" type="video/mp4">
-            </video>
-          </div>
-        </div>
-      </div>
-    `;
+            <div class="relative w-full max-w-4xl mx-auto">
+              <div class="bg-dark-800 rounded-lg overflow-hidden shadow-xl">
+                <div class="flex items-center justify-between p-4 border-b border-gray-700">
+                  <h3 class="text-lg font-medium truncate pr-4">${mediaTitle || 'Now Playing'}</h3>
+                  <button id="close-player-btn" class="text-gray-400 hover:text-white"><i class="ti ti-x text-xl"></i></button>
+                </div>
+                <div class="bg-black aspect-video">
+                  <video id="native-player" class="w-full h-full" controls preload="auto" autoplay>
+                    <source src="/stream/${mediaId}" type="video/mp4">
+                  </video>
+                </div>
+              </div>
+            </div>`;
         }
-
         document.body.appendChild(modal);
         document.body.classList.add('overflow-hidden');
-
         const closePlayer = () => {
           const video = document.getElementById('native-player');
           const audio = document.getElementById('audio-player');
@@ -579,7 +1245,6 @@
           modal.remove();
           document.body.classList.remove('overflow-hidden');
         };
-
         document.getElementById('close-player-btn').addEventListener('click', closePlayer);
         modal.addEventListener('click', (e) => { if (e.target === modal) closePlayer(); });
         document.addEventListener('keydown', function handler(e) {
@@ -587,15 +1252,14 @@
         });
       }
 
+      // ============================================================
+      // RENAME / DELETE (single file)
+      // ============================================================
       async function showRenameDialog(videoId, currentTitle) {
         const result = await createModalDialog({
-          type: 'info',
-          icon: 'ti-pencil',
-          title: 'Rename Video',
+          type: 'info', icon: 'ti-pencil', title: 'Rename Video',
           message: 'Enter a new title for your video:',
-          hasInput: true,
-          inputValue: currentTitle,
-          confirmText: 'Save'
+          hasInput: true, inputValue: currentTitle, confirmText: 'Save'
         });
         if (result.confirmed && result.value && result.value !== currentTitle) {
           try {
@@ -605,43 +1269,31 @@
               body: JSON.stringify({ title: result.value })
             });
             const data = await response.json();
-            if (data.success) {
-              showToast('success', 'Video renamed successfully');
-              setTimeout(() => window.location.reload(), 1000);
-            } else {
-              showToast('error', data.error || 'Failed to rename video');
-            }
-          } catch (error) {
-            showToast('error', 'An error occurred while renaming the video');
-          }
+            if (data.success) { showToast('success', 'Video renamed successfully'); setTimeout(() => window.location.reload(), 1000); }
+            else showToast('error', data.error || 'Failed to rename video');
+          } catch (e) { showToast('error', 'An error occurred while renaming'); }
         }
       }
 
       async function showDeleteDialog(videoId, videoTitle) {
         const result = await createModalDialog({
-          type: 'danger',
-          icon: 'ti-trash',
-          title: 'Delete Video',
+          type: 'danger', icon: 'ti-trash', title: 'Delete Video',
           message: `Are you sure you want to delete "${videoTitle}"? This action cannot be undone.`,
-          confirmText: 'Delete',
-          confirmClass: 'bg-red-500 hover:bg-red-600'
+          confirmText: 'Delete', confirmClass: 'bg-red-500 hover:bg-red-600'
         });
         if (result.confirmed) {
           try {
             const response = await fetch(`/api/videos/${videoId}`, { method: 'DELETE' });
             const data = await response.json();
-            if (data.success) {
-              showToast('success', 'Video deleted successfully');
-              setTimeout(() => window.location.reload(), 1000);
-            } else {
-              showToast('error', data.error || 'Failed to delete video');
-            }
-          } catch (error) {
-            showToast('error', 'An error occurred while deleting the video');
-          }
+            if (data.success) { showToast('success', 'Video deleted successfully'); setTimeout(() => window.location.reload(), 1000); }
+            else showToast('error', data.error || 'Failed to delete video');
+          } catch (e) { showToast('error', 'An error occurred while deleting'); }
         }
       }
 
+      // ============================================================
+      // GENERIC MODAL DIALOG
+      // ============================================================
       function createModalDialog(options) {
         const dialog = document.createElement('div');
         dialog.id = 'custom-modal';
@@ -652,32 +1304,28 @@
         };
         const theme = themes[options.type || 'info'];
         dialog.innerHTML = `
-    <div class="max-w-md w-full mx-4">
-      <div class="bg-dark-800 rounded-lg shadow-xl overflow-hidden">
-        <div class="p-6">
-          <div class="flex items-start gap-4">
-            <div class="w-12 h-12 rounded-full ${theme.bg} flex items-center justify-center shrink-0">
-              <i class="ti ${theme.icon} ${theme.color} text-2xl"></i>
+          <div class="max-w-md w-full mx-4">
+            <div class="bg-dark-800 rounded-lg shadow-xl overflow-hidden">
+              <div class="p-6">
+                <div class="flex items-start gap-4">
+                  <div class="w-12 h-12 rounded-full ${theme.bg} flex items-center justify-center shrink-0">
+                    <i class="ti ${theme.icon} ${theme.color} text-2xl"></i>
+                  </div>
+                  <div class="flex-1">
+                    <h3 class="text-lg font-semibold">${options.title}</h3>
+                    <p class="text-gray-400 text-sm mt-1">${options.message}</p>
+                  </div>
+                </div>
+                ${options.hasInput ? `<input type="text" id="modal-input" class="mt-4 w-full bg-dark-700 border border-gray-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary" value="${options.inputValue || ''}" autofocus>` : ''}
+              </div>
+              <div class="flex justify-end gap-3 p-4 border-t border-gray-700">
+                <button id="modal-cancel-btn" class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg transition-colors">Cancel</button>
+                <button id="modal-confirm-btn" class="${options.confirmClass || theme.button} px-4 py-2 text-white rounded-lg transition-colors">${options.confirmText || 'Confirm'}</button>
+              </div>
             </div>
-            <div class="flex-1">
-              <h3 class="text-lg font-semibold">${options.title}</h3>
-              <p class="text-gray-400 text-sm mt-1">${options.message}</p>
-            </div>
-          </div>
-          ${options.hasInput ? `
-          <input type="text" id="modal-input" class="mt-4 w-full bg-dark-700 border border-gray-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary" value="${options.inputValue || ''}" autofocus>
-          ` : ''}
-        </div>
-        <div class="flex justify-end gap-3 p-4 border-t border-gray-700">
-          <button id="modal-cancel-btn" class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg transition-colors">Cancel</button>
-          <button id="modal-confirm-btn" class="${options.confirmClass || theme.button} px-4 py-2 text-white rounded-lg transition-colors">${options.confirmText || 'Confirm'}</button>
-        </div>
-      </div>
-    </div>
-  `;
+          </div>`;
         document.body.appendChild(dialog);
         document.body.classList.add('overflow-hidden');
-
         return new Promise((resolve) => {
           const close = (confirmed = false, value = null) => {
             document.body.classList.remove('overflow-hidden');
@@ -692,11 +1340,40 @@
           dialog.addEventListener('click', (e) => { if (e.target === dialog) close(); });
           if (options.hasInput) {
             const input = document.getElementById('modal-input');
-            input.focus();
-            input.select();
+            input.focus(); input.select();
             input.addEventListener('keydown', (e) => { if (e.key === 'Enter') close(true, input.value); });
           }
         });
+      }
+
+      // ============================================================
+      // UPLOAD MODAL
+      // ============================================================
+      function switchUploadTab(type) {
+        currentUploadType = type;
+        document.getElementById('uploadType').value = type;
+        const tabVideo = document.getElementById('tabVideo');
+        const tabAudio = document.getElementById('tabAudio');
+        const dropzoneIcon = document.getElementById('dropzoneIcon');
+        const dropzoneText = document.getElementById('dropzoneText');
+        const dropzoneFormats = document.getElementById('dropzoneFormats');
+        const mediaFileInput = document.getElementById('mediaFileInput');
+        if (type === 'video') {
+          tabVideo.className = 'flex-1 py-2 px-4 rounded-lg bg-primary text-white transition-colors';
+          tabAudio.className = 'flex-1 py-2 px-4 rounded-lg bg-dark-700 text-gray-400 hover:text-white transition-colors';
+          dropzoneIcon.className = 'ti ti-video text-2xl text-gray-400';
+          dropzoneText.textContent = 'Drag and drop video files here';
+          dropzoneFormats.textContent = 'Supported formats: MP4, AVI, MOV, and more (max 50GB)';
+          mediaFileInput.accept = 'video/mp4,video/avi,video/quicktime,video/x-matroska,video/webm,video/x-flv,video/x-ms-wmv,video/x-m4v,video/mpeg,video/mp2t,application/octet-stream';
+        } else {
+          tabVideo.className = 'flex-1 py-2 px-4 rounded-lg bg-dark-700 text-gray-400 hover:text-white transition-colors';
+          tabAudio.className = 'flex-1 py-2 px-4 rounded-lg bg-primary text-white transition-colors';
+          dropzoneIcon.className = 'ti ti-music text-2xl text-gray-400';
+          dropzoneText.textContent = 'Drag and drop audio files here';
+          dropzoneFormats.textContent = 'Supported formats: MP3, WAV, AAC, and more';
+          mediaFileInput.accept = 'audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/aac,audio/mp4,audio/x-m4a,audio/ogg,audio/flac';
+        }
+        resetUploadForm();
       }
 
       function openUploadModal() {
@@ -724,17 +1401,17 @@
         selectedFiles = [];
       }
 
+      // ============================================================
+      // CLOUD IMPORT
+      // ============================================================
       let currentCloudType = '';
 
       function toggleCloudDropdown() {
-        const dropdown = document.getElementById('cloudDropdown');
-        dropdown.classList.toggle('hidden');
+        document.getElementById('cloudDropdown').classList.toggle('hidden');
       }
-
       document.addEventListener('click', function (e) {
         const dropdown = document.getElementById('cloudDropdown');
-        const button = e.target.closest('button[onclick="toggleCloudDropdown()"]');
-        if (!button && !e.target.closest('#cloudDropdown')) {
+        if (!e.target.closest('button[onclick="toggleCloudDropdown()"]') && !e.target.closest('#cloudDropdown')) {
           dropdown.classList.add('hidden');
         }
       });
@@ -742,85 +1419,41 @@
       function openCloudModal(type) {
         currentCloudType = type;
         document.getElementById('cloudDropdown').classList.add('hidden');
-        const modal = document.getElementById('cloudImportModal');
-        modal.classList.remove('hidden');
+        document.getElementById('cloudImportModal').classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
         initCloudModal(type);
       }
-
       function closeCloudModal() {
-        const modal = document.getElementById('cloudImportModal');
-        modal.classList.add('hidden');
+        document.getElementById('cloudImportModal').classList.add('hidden');
         document.body.classList.remove('overflow-hidden');
-      }
-
-      function openGDriveModal() {
-        openCloudModal('gdrive');
-      }
-
-      function closeGDriveModal() {
-        closeCloudModal();
       }
 
       function initCloudModal(type) {
         const configs = {
-          gdrive: {
-            title: 'Import from Google Drive',
-            icon: '/images/google drive.png',
-            placeholder: 'https://drive.google.com/file/d/...',
-            hint: 'Make sure the file is shared with "Anyone with the link"',
-            endpoint: '/api/videos/import-drive',
-            urlField: 'driveUrl'
-          },
-          mediafire: {
-            title: 'Import from Mediafire',
-            icon: '/images/mediafire.png',
-            placeholder: 'https://www.mediafire.com/file/...',
-            hint: 'Paste the Mediafire file link',
-            endpoint: '/api/videos/import-mediafire',
-            urlField: 'mediafireUrl'
-          },
-          dropbox: {
-            title: 'Import from Dropbox',
-            icon: '/images/dropbox.png',
-            placeholder: 'https://www.dropbox.com/...',
-            hint: 'Make sure the file is publicly accessible',
-            endpoint: '/api/videos/import-dropbox',
-            urlField: 'dropboxUrl'
-          },
-          mega: {
-            title: 'Import from MEGA',
-            icon: '/images/mega.png',
-            placeholder: 'https://mega.nz/file/...',
-            hint: 'Paste the MEGA file link (public files only)',
-            endpoint: '/api/videos/import-mega',
-            urlField: 'megaUrl'
-          }
+          gdrive: { title: 'Import from Google Drive', icon: '/images/google drive.png', placeholder: 'https://drive.google.com/file/d/...', hint: 'Make sure the file is shared with "Anyone with the link"', endpoint: '/api/videos/import-drive', urlField: 'driveUrl' },
+          mediafire: { title: 'Import from Mediafire', icon: '/images/mediafire.png', placeholder: 'https://www.mediafire.com/file/...', hint: 'Paste the Mediafire file link', endpoint: '/api/videos/import-mediafire', urlField: 'mediafireUrl' },
+          dropbox: { title: 'Import from Dropbox', icon: '/images/dropbox.png', placeholder: 'https://www.dropbox.com/...', hint: 'Make sure the file is publicly accessible', endpoint: '/api/videos/import-dropbox', urlField: 'dropboxUrl' },
+          mega: { title: 'Import from MEGA', icon: '/images/mega.png', placeholder: 'https://mega.nz/file/...', hint: 'Paste the MEGA file link (public files only)', endpoint: '/api/videos/import-mega', urlField: 'megaUrl' }
         };
-
         const config = configs[type];
         document.getElementById('cloudModalTitle').textContent = config.title;
-
         document.getElementById('cloudModalBody').innerHTML = `
-    <div class="p-6">
-      <div class="text-center mb-6">
-        <div class="w-16 h-16 rounded-full bg-dark-700 flex items-center justify-center mx-auto mb-3">
-          <img src="${config.icon}" alt="${config.title}" class="w-10 h-10">
-        </div>
-        <p class="text-gray-400 text-sm">Paste a link to your video</p>
-      </div>
-      <div class="relative mb-3">
-        <input type="text" id="cloud-link" class="w-full bg-dark-700 border border-gray-600 text-white pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary" placeholder="${config.placeholder}">
-        <i class="ti ti-link absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-      </div>
-      <p class="text-xs text-gray-500 mb-4">${config.hint}</p>
-      <button id="import-cloud-button" class="w-full bg-primary hover:bg-blue-600 text-white py-2 rounded-lg transition-colors flex items-center justify-center">
-        <i class="ti ti-download mr-2"></i>
-        Import Video
-      </button>
-    </div>
-  `;
-
+          <div class="p-6">
+            <div class="text-center mb-6">
+              <div class="w-16 h-16 rounded-full bg-dark-700 flex items-center justify-center mx-auto mb-3">
+                <img src="${config.icon}" alt="${config.title}" class="w-10 h-10">
+              </div>
+              <p class="text-gray-400 text-sm">Paste a link to your video</p>
+            </div>
+            <div class="relative mb-3">
+              <input type="text" id="cloud-link" class="w-full bg-dark-700 border border-gray-600 text-white pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary" placeholder="${config.placeholder}">
+              <i class="ti ti-link absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+            </div>
+            <p class="text-xs text-gray-500 mb-4">${config.hint}</p>
+            <button id="import-cloud-button" class="w-full bg-primary hover:bg-blue-600 text-white py-2 rounded-lg transition-colors flex items-center justify-center">
+              <i class="ti ti-download mr-2"></i>Import Video
+            </button>
+          </div>`;
         document.getElementById('closeCloudBtn').addEventListener('click', closeCloudModal);
         document.getElementById('import-cloud-button').addEventListener('click', async function () {
           const link = document.getElementById('cloud-link').value;
@@ -836,19 +1469,9 @@
               body: JSON.stringify(body)
             });
             const result = await response.json();
-            if (result.success) {
-              showImportProgress(result.jobId);
-              closeCloudModal();
-            } else {
-              showToast('error', result.error || 'Failed to import video');
-              this.disabled = false;
-              this.innerHTML = '<i class="ti ti-download mr-2"></i>Import Video';
-            }
-          } catch (error) {
-            showToast('error', 'An error occurred while importing the video');
-            this.disabled = false;
-            this.innerHTML = '<i class="ti ti-download mr-2"></i>Import Video';
-          }
+            if (result.success) { showImportProgress(result.jobId); closeCloudModal(); }
+            else { showToast('error', result.error || 'Failed to import video'); this.disabled = false; this.innerHTML = '<i class="ti ti-download mr-2"></i>Import Video'; }
+          } catch (e) { showToast('error', 'An error occurred while importing'); this.disabled = false; this.innerHTML = '<i class="ti ti-download mr-2"></i>Import Video'; }
         });
       }
 
@@ -857,21 +1480,19 @@
         modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm modal-overlay';
         modal.id = 'import-progress-modal';
         modal.innerHTML = `
-    <div class="bg-dark-800 rounded-lg p-6 w-full max-w-sm mx-4">
-      <div class="text-center">
-        <div class="w-16 h-16 mb-4 rounded-full bg-primary/10 mx-auto flex items-center justify-center">
-          <i id="progress-icon" class="ti ti-download text-primary text-2xl"></i>
-        </div>
-        <p id="progress-status" class="text-sm text-gray-300 mb-4">Starting download...</p>
-        <div class="w-full bg-dark-700 rounded-full h-2.5 mb-4">
-          <div id="progress-bar" class="bg-primary h-2.5 rounded-full transition-all" style="width: 0%"></div>
-        </div>
-        <button onclick="document.getElementById('import-progress-modal').remove()" class="text-sm text-gray-500 hover:text-white">Close</button>
-      </div>
-    </div>
-  `;
+          <div class="bg-dark-800 rounded-lg p-6 w-full max-w-sm mx-4">
+            <div class="text-center">
+              <div class="w-16 h-16 mb-4 rounded-full bg-primary/10 mx-auto flex items-center justify-center">
+                <i id="progress-icon" class="ti ti-download text-primary text-2xl"></i>
+              </div>
+              <p id="progress-status" class="text-sm text-gray-300 mb-4">Starting download...</p>
+              <div class="w-full bg-dark-700 rounded-full h-2.5 mb-4">
+                <div id="progress-bar" class="bg-primary h-2.5 rounded-full transition-all" style="width: 0%"></div>
+              </div>
+              <button onclick="document.getElementById('import-progress-modal').remove()" class="text-sm text-gray-500 hover:text-white">Close</button>
+            </div>
+          </div>`;
         document.body.appendChild(modal);
-
         const interval = setInterval(async () => {
           try {
             const response = await fetch(`/api/videos/import-status/${jobId}`);
@@ -894,31 +1515,163 @@
         }, 1000);
       }
 
-
+      // ============================================================
+      // UPLOAD (chunked / simple / audio) — unchanged from original
+      // ============================================================
       let selectedFiles = [];
-      const CHUNK_SIZE = 50 * 1024 * 1024; // 50MB per chunk
+      const CHUNK_SIZE = 50 * 1024 * 1024;
       const MAX_RETRIES = 3;
       const RETRY_DELAY_MS = 1000;
 
       function isAudioFile(file) {
-        const audioTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/aac', 'audio/mp4', 'audio/x-m4a', 'audio/ogg', 'audio/flac', 'audio/x-flac'];
-        const audioExts = ['.mp3', '.wav', '.aac', '.m4a', '.ogg', '.flac'];
+        const audioTypes = ['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/aac','audio/mp4','audio/x-m4a','audio/ogg','audio/flac','audio/x-flac'];
+        const audioExts = ['.mp3','.wav','.aac','.m4a','.ogg','.flac'];
         const ext = '.' + file.name.split('.').pop().toLowerCase();
         return audioTypes.includes(file.type) || audioExts.includes(ext);
       }
-
       function isVideoFile(file) {
-        const videoTypes = [
-          'video/mp4', 'video/avi', 'video/quicktime', 'video/x-msvideo',
-          'video/x-matroska', 'video/webm', 'video/x-flv', 'video/x-ms-wmv',
-          'video/x-m4v', 'video/mpeg', 'video/mp2t', 'application/octet-stream'
-        ];
-        const videoExts = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v', '.ts', '.mpeg', '.mpg'];
+        const videoTypes = ['video/mp4','video/avi','video/quicktime','video/x-msvideo','video/x-matroska','video/webm','video/x-flv','video/x-ms-wmv','video/x-m4v','video/mpeg','video/mp2t','application/octet-stream'];
+        const videoExts = ['.mp4','.avi','.mov','.mkv','.webm','.flv','.wmv','.m4v','.ts','.mpeg','.mpg'];
         const ext = '.' + file.name.split('.').pop().toLowerCase();
         return videoTypes.includes(file.type) || videoExts.includes(ext);
       }
 
+      // ============================================================
+      // SEARCH / FILTER / SORT / PAGINATION
+      // ============================================================
+      let filteredGridItems = [];
+      let filteredListItems = [];
+      let currentPage = 1;
+      const itemsPerPage = 18;
+
+      function getItemData(item) {
+        return {
+          id: item.dataset.id,
+          title: item.dataset.title || '',
+          date: new Date(item.dataset.date || 0).getTime(),
+          size: parseInt(item.dataset.size) || 0,
+          type: item.dataset.type || 'video',
+          folder: item.dataset.folder || ''
+        };
+      }
+
+      function filterAndSort() {
+        const search = document.getElementById('searchInput') ? document.getElementById('searchInput').value.toLowerCase() : '';
+        const sort = document.getElementById('sortSelect') ? document.getElementById('sortSelect').value : 'newest';
+        const type = document.getElementById('typeFilter') ? document.getElementById('typeFilter').value : 'all';
+
+        const gridItems = document.querySelectorAll('.file-item');
+        const listItems = document.querySelectorAll('.file-item-row');
+
+        const filterFn = (item) => {
+          const data = getItemData(item);
+          // Must be in current folder
+          const folderMatch = currentFolderId === null
+            ? data.folder === ''
+            : data.folder === String(currentFolderId);
+          const matchesSearch = data.title.toLowerCase().includes(search);
+          const matchesType = type === 'all' || data.type === type;
+          return folderMatch && matchesSearch && matchesType;
+        };
+
+        const sortFn = (a, b) => {
+          const dataA = getItemData(a);
+          const dataB = getItemData(b);
+          switch (sort) {
+            case 'oldest': return dataA.date - dataB.date;
+            case 'name': return dataA.title.localeCompare(dataB.title);
+            case 'size': return dataB.size - dataA.size;
+            default: return dataB.date - dataA.date;
+          }
+        };
+
+        filteredGridItems = [...gridItems].filter(filterFn).sort(sortFn);
+        filteredListItems = [...listItems].filter(filterFn).sort(sortFn);
+
+        const gridContainer = document.getElementById('fileGridContainer');
+        const listContainer = document.querySelector('#fileListBody');
+
+        if (gridContainer) filteredGridItems.forEach(item => gridContainer.appendChild(item));
+        if (listContainer) filteredListItems.forEach(item => listContainer.appendChild(item));
+
+        currentPage = 1;
+        renderPage();
+      }
+
+      function renderPage() {
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+
+        document.querySelectorAll('.file-item').forEach(item => item.style.display = 'none');
+        document.querySelectorAll('.file-item-row').forEach(item => item.style.display = 'none');
+
+        filteredGridItems.slice(start, end).forEach(item => item.style.display = '');
+        filteredListItems.slice(start, end).forEach(item => item.style.display = '');
+
+        const totalItems = filteredGridItems.length;
+        const info = document.getElementById('paginationInfo');
+        if (info) info.textContent = totalItems > 0
+          ? `Showing ${start + 1}-${Math.min(end, totalItems)} of ${totalItems} items`
+          : 'No items found';
+
+        renderPagination();
+        updateSelectAllState();
+      }
+
+      function renderPagination() {
+        const container = document.getElementById('paginationControls');
+        if (!container) return;
+        const totalPages = Math.ceil(filteredGridItems.length / itemsPerPage);
+        container.innerHTML = '';
+        if (totalPages <= 1) return;
+
+        const prev = document.createElement('button');
+        prev.className = `w-9 h-9 flex items-center justify-center rounded-lg ${currentPage === 1 ? 'bg-dark-700 text-gray-600 cursor-not-allowed' : 'bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white transition-colors'}`;
+        prev.innerHTML = '<i class="ti ti-chevron-left"></i>';
+        prev.disabled = currentPage === 1;
+        prev.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderPage(); } });
+        container.appendChild(prev);
+
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, startPage + 4);
+        if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+        for (let i = startPage; i <= endPage; i++) {
+          const btn = document.createElement('button');
+          btn.className = `w-9 h-9 flex items-center justify-center rounded-lg ${i === currentPage ? 'bg-primary text-white' : 'bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white transition-colors'}`;
+          btn.textContent = i;
+          btn.addEventListener('click', () => { currentPage = i; renderPage(); });
+          container.appendChild(btn);
+        }
+
+        const next = document.createElement('button');
+        next.className = `w-9 h-9 flex items-center justify-center rounded-lg ${currentPage === totalPages ? 'bg-dark-700 text-gray-600 cursor-not-allowed' : 'bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white transition-colors'}`;
+        next.innerHTML = '<i class="ti ti-chevron-right"></i>';
+        next.disabled = currentPage === totalPages;
+        next.addEventListener('click', () => { if (currentPage < totalPages) { currentPage++; renderPage(); } });
+        container.appendChild(next);
+      }
+
+      // ============================================================
+      // DOMContentLoaded — wire up upload logic
+      // ============================================================
       document.addEventListener('DOMContentLoaded', function () {
+
+        // List view checkbox — capture phase mencegah <tr onclick> terpanggil
+        const fileListBody = document.getElementById('fileListBody');
+        if (fileListBody) {
+          fileListBody.addEventListener('click', function (e) {
+            const cb = e.target.closest('.file-checkbox');
+            if (!cb) return;
+            e.stopImmediatePropagation();
+            e.stopPropagation();
+          }, true);
+          fileListBody.addEventListener('change', function (e) {
+            const cb = e.target.closest('.file-checkbox');
+            if (!cb) return;
+            handleCheckboxChange(cb);
+          });
+        }
+
         const mediaFileInput = document.getElementById('mediaFileInput');
         const selectedFileInfo = document.getElementById('selectedFileInfo');
         const selectedFileCount = document.getElementById('selectedFileCount');
@@ -931,8 +1684,6 @@
         const uploadProgressPercent = document.getElementById('uploadProgressPercent');
         const uploadProgressStatus = document.getElementById('uploadProgressStatus');
         const uploadFilesList = document.getElementById('uploadFilesList');
-        const searchInput = document.getElementById('searchInput');
-        const sortSelect = document.getElementById('sortSelect');
 
         if (mediaFileInput) {
           mediaFileInput.addEventListener('change', function () {
@@ -940,21 +1691,11 @@
             if (newFiles.length > 0) {
               const maxSize = 50 * 1024 * 1024 * 1024;
               const large = newFiles.filter(f => f.size > maxSize);
-              if (large.length > 0) {
-                showToast('error', `File too large: ${large.map(f => f.name).join(', ')}`);
-                this.value = '';
-                return;
-              }
+              if (large.length > 0) { showToast('error', `File too large: ${large.map(f => f.name).join(', ')}`); this.value = ''; return; }
               const totalNewSize = newFiles.reduce((sum, f) => sum + f.size, 0);
               const totalSelectedSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
-              if (!checkDiskLimit(totalNewSize + totalSelectedSize)) {
-                showToast('error', `Not enough server disk space. Available: ${formatFileSize(getRemainingSpace())}`);
-                this.value = '';
-                return;
-              }
-              newFiles.forEach(f => {
-                if (!selectedFiles.some(e => e.name === f.name && e.size === f.size)) selectedFiles.push(f);
-              });
+              if (!checkDiskLimit(totalNewSize + totalSelectedSize)) { showToast('error', `Not enough server disk space. Available: ${formatFileSize(getRemainingSpace())}`); this.value = ''; return; }
+              newFiles.forEach(f => { if (!selectedFiles.some(e => e.name === f.name && e.size === f.size)) selectedFiles.push(f); });
               updateFilesList();
               uploadDropzone.classList.add('hidden');
               selectedFileInfo.classList.remove('hidden');
@@ -974,19 +1715,18 @@
             const div = document.createElement('div');
             div.className = 'flex items-center justify-between p-2 rounded-lg hover:bg-dark-600 transition-colors';
             div.innerHTML = `
-        <div class="flex items-center gap-3 min-w-0">
-          <div class="w-8 h-8 rounded bg-dark-600 flex items-center justify-center shrink-0">
-            <i class="ti ${icon} text-gray-400 text-sm"></i>
-          </div>
-          <div class="min-w-0">
-            <p class="text-sm truncate">${file.name}</p>
-            <p class="text-xs text-gray-500">${formatFileSize(file.size)}</p>
-          </div>
-        </div>
-        <button type="button" class="text-gray-400 hover:text-red-400 p-1" data-index="${i}">
-          <i class="ti ti-x text-sm"></i>
-        </button>
-      `;
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-8 h-8 rounded bg-dark-600 flex items-center justify-center shrink-0">
+                  <i class="ti ${icon} text-gray-400 text-sm"></i>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm truncate">${file.name}</p>
+                  <p class="text-xs text-gray-500">${formatFileSize(file.size)}</p>
+                </div>
+              </div>
+              <button type="button" class="text-gray-400 hover:text-red-400 p-1" data-index="${i}">
+                <i class="ti ti-x text-sm"></i>
+              </button>`;
             div.querySelector('button').addEventListener('click', () => {
               selectedFiles.splice(i, 1);
               if (selectedFiles.length > 0) updateFilesList();
@@ -1014,14 +1754,13 @@
               const div = document.createElement('div');
               div.className = 'flex items-center justify-between p-2 rounded-lg';
               div.innerHTML = `
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="w-8 h-8 rounded bg-dark-600 flex items-center justify-center shrink-0">
-              <i class="ti ${icon} text-gray-400 text-sm"></i>
-            </div>
-            <span class="text-sm truncate">${f.name}</span>
-          </div>
-          <span class="file-status text-xs text-gray-500">Waiting</span>
-        `;
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="w-8 h-8 rounded bg-dark-600 flex items-center justify-center shrink-0">
+                    <i class="ti ${icon} text-gray-400 text-sm"></i>
+                  </div>
+                  <span class="text-sm truncate">${f.name}</span>
+                </div>
+                <span class="file-status text-xs text-gray-500">Waiting</span>`;
               uploadFilesList.appendChild(div);
             });
 
@@ -1030,43 +1769,25 @@
               const isAudio = isAudioFile(file);
               uploadProgressStatus.textContent = `Uploading ${i + 1}/${selectedFiles.length}: ${file.name}`;
               updateFileProgress(i, 'uploading', 0);
-
-              // Check server disk space before uploading
               if (!checkDiskLimit(file.size)) {
                 showToast('error', `Not enough server disk space to upload ${file.name}`);
-                failed.push(file.name);
-                failedErrors.push('Insufficient server disk space');
-                updateFileProgress(i, 'error', 0);
-                continue;
+                failed.push(file.name); failedErrors.push('Insufficient server disk space');
+                updateFileProgress(i, 'error', 0); continue;
               }
-
               const result = isAudio ? await uploadAudio(file, i, selectedFiles.length) : await uploadFile(file, i, selectedFiles.length);
-
               if (result.success) { success++; updateFileProgress(i, 'success', 100); }
-              else {
-                failed.push(file.name);
-                failedErrors.push(result.error || 'Unknown error');
-                updateFileProgress(i, 'error', 0);
-              }
+              else { failed.push(file.name); failedErrors.push(result.error || 'Unknown error'); updateFileProgress(i, 'error', 0); }
             }
 
-            if (failed.length === 0) {
-              showToast('success', `${success} file${success > 1 ? 's' : ''} uploaded successfully`);
-            } else if (failed.length === 1) {
-              const reason = failedErrors[0] ? `: ${failedErrors[0]}` : '';
-              showToast('warning', `Upload failed for "${failed[0]}"${reason}`);
-            } else {
-              showToast('warning', `${success} uploaded, ${failed.length} failed. Failed: ${failed.map((name, i) => failedErrors[i] ? `${name} (${failedErrors[i]})` : name).join(', ')}`);
-            }
+            if (failed.length === 0) showToast('success', `${success} file${success > 1 ? 's' : ''} uploaded successfully`);
+            else if (failed.length === 1) showToast('warning', `Upload failed for "${failed[0]}": ${failedErrors[0] || ''}`);
+            else showToast('warning', `${success} uploaded, ${failed.length} failed`);
             setTimeout(() => window.location.reload(), 2000);
           });
         }
 
         async function uploadFile(file, index, total) {
-          const useChunked = file.size > CHUNK_SIZE;
-          return useChunked
-            ? uploadChunked(file, index, total)
-            : uploadSimple(file, index, total);
+          return file.size > CHUNK_SIZE ? uploadChunked(file, index, total) : uploadSimple(file, index, total);
         }
 
         function updateProgress(index, total, loadedBytes, totalBytes, status) {
@@ -1089,49 +1810,27 @@
 
         async function uploadAudio(file, index, total) {
           return new Promise((resolve) => {
-            if (!file || !(file instanceof File)) {
-              return resolve({ success: false, error: 'File tidak valid' });
-            }
-
+            if (!file || !(file instanceof File)) return resolve({ success: false, error: 'File tidak valid' });
             const formData = new FormData();
             formData.append('audio', file);
-
             const xhr = new XMLHttpRequest();
-            const timeoutMs = Math.max(2, Math.ceil(file.size / (10 * 1024 * 1024))) * 60 * 1000;
-            xhr.timeout = timeoutMs;
-
+            xhr.timeout = Math.max(2, Math.ceil(file.size / (10 * 1024 * 1024))) * 60 * 1000;
             xhr.upload.addEventListener('progress', (e) => {
               if (!e.lengthComputable) return;
-              try {
-                const pct = Math.round((e.loaded / e.total) * 100);
-                const overall = Math.round(((index + e.loaded / e.total) / total) * 100);
-                if (uploadProgressBar) uploadProgressBar.style.width = `${overall}%`;
-                if (uploadProgressPercent) uploadProgressPercent.textContent = `${overall}%`;
-                updateFileProgress(index, 'uploading', pct);
-              } catch (progressErr) {
-                console.warn('Progress update error:', progressErr);
-              }
+              const pct = Math.round((e.loaded / e.total) * 100);
+              const overall = Math.round(((index + e.loaded / e.total) / total) * 100);
+              if (uploadProgressBar) uploadProgressBar.style.width = `${overall}%`;
+              if (uploadProgressPercent) uploadProgressPercent.textContent = `${overall}%`;
+              updateFileProgress(index, 'uploading', pct);
             });
-
             xhr.addEventListener('load', () => {
               if (xhr.status === 200) {
-                try {
-                  const r = JSON.parse(xhr.responseText);
-                  if (typeof r.success !== 'boolean') {
-                    return resolve({ success: false, error: 'Respons server tidak valid' });
-                  }
-                  resolve({ success: r.success, error: r.error || null });
-                } catch {
-                  resolve({ success: false, error: 'Gagal parse respons server' });
-                }
-              } else {
-                resolve({ success: false, error: `HTTP ${xhr.status}: ${xhr.statusText || 'Unknown error'}` });
-              }
+                try { const r = JSON.parse(xhr.responseText); resolve({ success: r.success, error: r.error || null }); }
+                catch { resolve({ success: false, error: 'Parse error' }); }
+              } else { resolve({ success: false, error: `HTTP ${xhr.status}` }); }
             });
-
             xhr.addEventListener('error', () => resolve({ success: false, error: 'Network error' }));
-            xhr.addEventListener('timeout', () => resolve({ success: false, error: `Timeout setelah ${timeoutMs / 1000}s` }));
-
+            xhr.addEventListener('timeout', () => resolve({ success: false, error: 'Timeout' }));
             xhr.open('POST', '/api/audio/upload', true);
             xhr.send(formData);
           });
@@ -1141,148 +1840,77 @@
           return new Promise((resolve) => {
             const formData = new FormData();
             formData.append('video', file);
-
             const xhr = new XMLHttpRequest();
             xhr.timeout = 30 * 60 * 1000;
-
-            xhr.upload.addEventListener('progress', (e) => {
-              if (e.lengthComputable) {
-                updateProgress(index, total, e.loaded, e.total, 'uploading');
-              }
-            });
-
+            xhr.upload.addEventListener('progress', (e) => { if (e.lengthComputable) updateProgress(index, total, e.loaded, e.total, 'uploading'); });
             xhr.addEventListener('load', () => {
               if (xhr.status === 200) {
-                try {
-                  const r = JSON.parse(xhr.responseText);
-                  resolve({ success: r.success, error: r.error || null });
-                } catch {
-                  resolve({ success: false, error: 'Invalid server response' });
-                }
-              } else {
-                resolve({ success: false, error: `HTTP ${xhr.status}` });
-              }
+                try { const r = JSON.parse(xhr.responseText); resolve({ success: r.success, error: r.error || null }); }
+                catch { resolve({ success: false, error: 'Invalid server response' }); }
+              } else { resolve({ success: false, error: `HTTP ${xhr.status}` }); }
             });
-
             xhr.addEventListener('error', () => resolve({ success: false, error: 'Network error' }));
             xhr.addEventListener('timeout', () => resolve({ success: false, error: 'Upload timed out' }));
-            xhr.addEventListener('abort', () => resolve({ success: false, error: 'Upload aborted' }));
-
             xhr.open('POST', '/api/videos/upload', true);
             xhr.send(formData);
           });
         }
 
         async function uploadChunked(file, index, total) {
-          // 1. Init upload session
           let initData;
           try {
             const initResp = await fetch('/api/videos/chunk/init', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                filename: file.name,
-                fileSize: file.size,
-                totalChunks: Math.ceil(file.size / CHUNK_SIZE),
-              }),
+              body: JSON.stringify({ filename: file.name, fileSize: file.size, totalChunks: Math.ceil(file.size / CHUNK_SIZE) })
             });
-
-            if (!initResp.ok) {
-              return { success: false, error: `Init failed: HTTP ${initResp.status}` };
-            }
-
+            if (!initResp.ok) return { success: false, error: `Init failed: HTTP ${initResp.status}` };
             initData = await initResp.json();
-            if (!initData.success) {
-              return { success: false, error: initData.error || 'Init failed' };
-            }
-          } catch (e) {
-            return { success: false, error: `Init request error: ${e.message}` };
-          }
+            if (!initData.success) return { success: false, error: initData.error || 'Init failed' };
+          } catch (e) { return { success: false, error: `Init error: ${e.message}` }; }
 
           const { uploadId } = initData;
           const serverChunkSize = initData.chunkSize || CHUNK_SIZE;
           const totalChunks = Math.ceil(file.size / serverChunkSize);
           let uploadedChunks = new Set(initData.uploadedChunks || []);
 
-          // 2. Upload tiap chunk
           for (let i = 0; i < totalChunks; i++) {
-            if (uploadedChunks.has(i)) {
-              // Chunk sudah terupload (resume), update progress saja
-              updateProgress(index, total, Math.min((i + 1) * serverChunkSize, file.size), file.size, 'uploading');
-              continue;
-            }
-
+            if (uploadedChunks.has(i)) { updateProgress(index, total, Math.min((i + 1) * serverChunkSize, file.size), file.size, 'uploading'); continue; }
             const start = i * serverChunkSize;
-            const end = Math.min(start + serverChunkSize, file.size);
-            const chunk = file.slice(start, end);
-
-            let success = false;
-            let lastError = null;
-
+            const chunk = file.slice(start, Math.min(start + serverChunkSize, file.size));
+            let success = false, lastError = null;
             for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
               try {
                 const res = await fetch('/api/videos/chunk/upload', {
                   method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/octet-stream',
-                    'X-Upload-Id': uploadId,
-                    'X-Chunk-Index': String(i),
-                  },
-                  body: chunk,
+                  headers: { 'Content-Type': 'application/octet-stream', 'X-Upload-Id': uploadId, 'X-Chunk-Index': String(i) },
+                  body: chunk
                 });
-
-                if (!res.ok) {
-                  lastError = `HTTP ${res.status}`;
-                  throw new Error(lastError);
-                }
-
+                if (!res.ok) { lastError = `HTTP ${res.status}`; throw new Error(lastError); }
                 const data = await res.json();
-                if (!data.success) {
-                  lastError = data.error || 'Chunk upload failed';
-                  throw new Error(lastError);
-                }
-
+                if (!data.success) { lastError = data.error || 'Chunk upload failed'; throw new Error(lastError); }
                 uploadedChunks = new Set(data.uploadedChunks || []);
-                success = true;
-                break;
-              } catch (e) {
-                lastError = e.message;
-                if (attempt < MAX_RETRIES - 1) {
-                  await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1))); // backoff
-                }
-              }
+                success = true; break;
+              } catch (e) { lastError = e.message; if (attempt < MAX_RETRIES - 1) await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (attempt + 1))); }
             }
-
-            if (!success) {
-              return { success: false, error: `Chunk ${i} gagal: ${lastError}` };
-            }
-
+            if (!success) return { success: false, error: `Chunk ${i} gagal: ${lastError}` };
             updateProgress(index, total, Math.min((i + 1) * serverChunkSize, file.size), file.size, 'uploading');
           }
 
-          // 3. Finalisasi upload
           try {
             const completeResp = await fetch('/api/videos/chunk/complete', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ uploadId }),
+              body: JSON.stringify({ uploadId })
             });
-
-            if (!completeResp.ok) {
-              return { success: false, error: `Complete failed: HTTP ${completeResp.status}` };
-            }
-
+            if (!completeResp.ok) return { success: false, error: `Complete failed: HTTP ${completeResp.status}` };
             const completeData = await completeResp.json();
             return { success: completeData.success, error: completeData.error || null };
-          } catch (e) {
-            return { success: false, error: `Complete request error: ${e.message}` };
-          }
+          } catch (e) { return { success: false, error: `Complete error: ${e.message}` }; }
         }
 
         if (uploadDropzone) {
-          uploadDropzone.addEventListener('click', (e) => {
-            if (!e.target.closest('label')) mediaFileInput.click();
-          });
+          uploadDropzone.addEventListener('click', (e) => { if (!e.target.closest('label')) mediaFileInput.click(); });
           uploadDropzone.addEventListener('dragenter', (e) => { e.preventDefault(); uploadDropzone.classList.add('border-primary', 'bg-primary/5'); });
           uploadDropzone.addEventListener('dragover', (e) => { e.preventDefault(); });
           uploadDropzone.addEventListener('dragleave', (e) => { e.preventDefault(); uploadDropzone.classList.remove('border-primary', 'bg-primary/5'); });
@@ -1291,187 +1919,44 @@
             uploadDropzone.classList.remove('border-primary', 'bg-primary/5');
             const files = e.dataTransfer.files;
             if (files.length > 0) {
-              const validFiles = Array.from(files).filter(f => {
-                if (currentUploadType === 'video') return isVideoFile(f);
-                return isAudioFile(f);
-              });
+              const validFiles = Array.from(files).filter(f => currentUploadType === 'video' ? isVideoFile(f) : isAudioFile(f));
               if (validFiles.length > 0) {
-                const totalNewSize = validFiles.reduce((sum, f) => sum + f.size, 0);
-                const totalSelectedSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
                 validFiles.forEach(f => { if (!selectedFiles.some(e => e.name === f.name && e.size === f.size)) selectedFiles.push(f); });
                 updateFilesList();
                 uploadDropzone.classList.add('hidden');
                 selectedFileInfo.classList.remove('hidden');
                 uploadButton.disabled = false;
               } else {
-                if (currentUploadType === 'video') showToast('error', 'Please upload a valid video file (MP4, AVI, MOV, MKV, WEBM, FLV, and more)');
-                else showToast('error', 'Please upload a valid audio file (MP3, WAV, AAC, M4A, OGG, FLAC)');
+                if (currentUploadType === 'video') showToast('error', 'Please upload a valid video file');
+                else showToast('error', 'Please upload a valid audio file');
               }
             }
           });
         }
 
-        const gridItems = document.querySelectorAll('.file-item');
-        const listItems = document.querySelectorAll('.file-item-row');
-        const itemsPerPage = 18;
-        let currentPage = 1;
-        let filteredGridItems = [...gridItems];
-        let filteredListItems = [...listItems];
-
-        function getItemData(item) {
-          return {
-            id: item.dataset.id,
-            title: item.dataset.title || '',
-            date: new Date(item.dataset.date || 0).getTime(),
-            size: parseInt(item.dataset.size) || 0,
-            type: item.dataset.type || 'video'
-          };
-        }
-
-        function filterAndSort() {
-          const search = searchInput ? searchInput.value.toLowerCase() : '';
-          const sort = sortSelect ? sortSelect.value : 'newest';
-          const typeFilter = document.getElementById('typeFilter');
-          const type = typeFilter ? typeFilter.value : 'all';
-
-          const filterFn = (item) => {
-            const data = getItemData(item);
-            const matchesSearch = data.title.toLowerCase().includes(search);
-            const matchesType = type === 'all' || data.type === type;
-            return matchesSearch && matchesType;
-          };
-
-          const sortFn = (a, b) => {
-            const dataA = getItemData(a);
-            const dataB = getItemData(b);
-
-            switch (sort) {
-              case 'oldest':
-                return dataA.date - dataB.date;
-              case 'newest':
-                return dataB.date - dataA.date;
-              case 'name':
-                return dataA.title.localeCompare(dataB.title);
-              case 'size':
-                return dataB.size - dataA.size;
-              default:
-                return dataB.date - dataA.date;
-            }
-          };
-
-          filteredGridItems = [...gridItems].filter(filterFn).sort(sortFn);
-          filteredListItems = [...listItems].filter(filterFn).sort(sortFn);
-
-          const gridContainer = document.getElementById('gridView');
-          const listContainer = document.querySelector('#listView tbody');
-
-          filteredGridItems.forEach(item => gridContainer.appendChild(item));
-          filteredListItems.forEach(item => listContainer.appendChild(item));
-
-          currentPage = 1;
-          renderPage();
-        }
-
-        function renderPage() {
-          const start = (currentPage - 1) * itemsPerPage;
-          const end = start + itemsPerPage;
-
-          gridItems.forEach(item => item.style.display = 'none');
-          listItems.forEach(item => item.style.display = 'none');
-
-          filteredGridItems.slice(start, end).forEach(item => item.style.display = '');
-          filteredListItems.slice(start, end).forEach(item => item.style.display = '');
-
-          const totalItems = filteredGridItems.length;
-          const info = document.getElementById('paginationInfo');
-          if (info) info.textContent = totalItems > 0 ? `Showing ${start + 1}-${Math.min(end, totalItems)} of ${totalItems} items` : 'No items found';
-
-          renderPagination();
-        }
-
-        function renderPagination() {
-          const container = document.getElementById('paginationControls');
-          if (!container) return;
-          const totalPages = Math.ceil(filteredGridItems.length / itemsPerPage);
-          container.innerHTML = '';
-
-          if (totalPages <= 1) return;
-
-          const prev = document.createElement('button');
-          prev.className = `w-9 h-9 flex items-center justify-center rounded-lg ${currentPage === 1 ? 'bg-dark-700 text-gray-600 cursor-not-allowed' : 'bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white transition-colors'}`;
-          prev.innerHTML = '<i class="ti ti-chevron-left"></i>';
-          prev.disabled = currentPage === 1;
-          prev.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderPage(); } });
-          container.appendChild(prev);
-
-          let startPage = Math.max(1, currentPage - 2);
-          let endPage = Math.min(totalPages, startPage + 4);
-          if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
-
-          for (let i = startPage; i <= endPage; i++) {
-            const btn = document.createElement('button');
-            btn.className = `w-9 h-9 flex items-center justify-center rounded-lg ${i === currentPage ? 'bg-primary text-white' : 'bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white transition-colors'}`;
-            btn.textContent = i;
-            btn.addEventListener('click', () => { currentPage = i; renderPage(); });
-            container.appendChild(btn);
-          }
-
-          const next = document.createElement('button');
-          next.className = `w-9 h-9 flex items-center justify-center rounded-lg ${currentPage === totalPages ? 'bg-dark-700 text-gray-600 cursor-not-allowed' : 'bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white transition-colors'}`;
-          next.innerHTML = '<i class="ti ti-chevron-right"></i>';
-          next.disabled = currentPage === totalPages;
-          next.addEventListener('click', () => { if (currentPage < totalPages) { currentPage++; renderPage(); } });
-          container.appendChild(next);
-        }
-
+        // Wire up filter/sort
+        const searchInput = document.getElementById('searchInput');
+        const sortSelect = document.getElementById('sortSelect');
+        const typeFilter = document.getElementById('typeFilter');
         if (searchInput) searchInput.addEventListener('input', filterAndSort);
         if (sortSelect) sortSelect.addEventListener('change', filterAndSort);
-        const typeFilter = document.getElementById('typeFilter');
         if (typeFilter) typeFilter.addEventListener('change', filterAndSort);
 
-        if (gridItems.length > 0) filterAndSort();
+        // Initial render
+        filterAndSort();
       });
     </script>
 
     <style>
-      * {
-        scrollbar-width: thin;
-        scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
-      }
+      * { scrollbar-width: thin; scrollbar-color: rgba(156,163,175,0.3) transparent; }
+      ::-webkit-scrollbar { width: 5px; height: 5px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background-color: rgba(156,163,175,0.3); border-radius: 20px; }
+      ::-webkit-scrollbar-thumb:hover { background-color: rgba(156,163,175,0.5); }
+      .audio-visualizer { animation: pulse 2s ease-in-out infinite; }
+      @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } }
 
-      ::-webkit-scrollbar {
-        width: 5px;
-        height: 5px;
-      }
-
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-
-      ::-webkit-scrollbar-thumb {
-        background-color: rgba(156, 163, 175, 0.3);
-        border-radius: 20px;
-      }
-
-      ::-webkit-scrollbar-thumb:hover {
-        background-color: rgba(156, 163, 175, 0.5);
-      }
-
-      .audio-visualizer {
-        animation: pulse 2s ease-in-out infinite;
-      }
-
-      @keyframes pulse {
-
-        0%,
-        100% {
-          transform: scale(1);
-          opacity: 1;
-        }
-
-        50% {
-          transform: scale(1.05);
-          opacity: 0.8;
-        }
-      }
+      /* Always show checkbox on checked state */
+      .file-checkbox:checked ~ * { opacity: 1; }
+      .file-item.ring-2 .checkbox-wrapper { opacity: 1 !important; }
     </style>

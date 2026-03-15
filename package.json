@@ -1,6 +1,6 @@
 {
   "name": "streamflow",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Cloud streaming solution with FFmpeg",
   "main": "app.js",
   "scripts": {

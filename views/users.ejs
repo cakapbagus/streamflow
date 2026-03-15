@@ -127,7 +127,7 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                 <div class="flex space-x-2">
-                  <button onclick="editUser('<%= user.id %>', '<%= user.username %>', '<%= user.user_role %>', '<%= user.status %>', '<%= user.avatar_path || '' %>', '<%= user.disk_limit || 0 %>')" 
+                  <button onclick="editUser('<%= user.id %>', '<%= user.username %>', '<%= user.user_role %>', '<%= user.status %>', '<%= user.avatar_path || '' %>')" 
                     class="text-blue-400 hover:text-blue-300 transition-colors" title="Edit User">
                     <i class="ti ti-edit"></i>
                   </button>
@@ -218,21 +218,6 @@
             </select>
           </div>
 
-          <div class="mb-4">
-            <label for="editDiskLimit" class="block text-sm font-medium text-gray-300 mb-2">Disk Limit</label>
-            <div class="flex gap-2">
-              <input type="number" id="editDiskLimitValue" min="0" step="1" placeholder="0"
-                class="flex-1 bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-              <select id="editDiskLimitUnit" class="w-24 bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-                <option value="1048576">MB</option>
-                <option value="1073741824">GB</option>
-                <option value="1099511627776">TB</option>
-              </select>
-            </div>
-            <input type="hidden" id="editDiskLimit" name="diskLimit" value="0">
-            <p class="text-xs text-gray-500 mt-1">Set to 0 or leave empty for unlimited storage</p>
-          </div>
-
           <div class="mb-6">
             <label for="editPassword" class="block text-sm font-medium text-gray-300 mb-2">New Password (optional)</label>
             <input type="password" id="editPassword" name="password" placeholder="Leave empty to keep current password"
@@ -307,21 +292,6 @@
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
-          </div>
-
-          <div class="mb-4">
-            <label for="createDiskLimit" class="block text-sm font-medium text-gray-300 mb-2">Disk Limit</label>
-            <div class="flex gap-2">
-              <input type="number" id="createDiskLimitValue" min="0" step="1" placeholder="0"
-                class="flex-1 bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-              <select id="createDiskLimitUnit" class="w-24 bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
-                <option value="1048576">MB</option>
-                <option value="1073741824">GB</option>
-                <option value="1099511627776">TB</option>
-              </select>
-            </div>
-            <input type="hidden" id="createDiskLimit" name="diskLimit" value="0">
-            <p class="text-xs text-gray-500 mt-1">Set to 0 or leave empty for unlimited storage</p>
           </div>
 
           <div class="mb-6">
@@ -501,23 +471,6 @@ function openEditModal(userId, username, role, status, avatar, diskLimit) {
   document.getElementById('editStatus').value = status;
   document.getElementById('editPassword').value = '';
   
-  const diskLimitBytes = parseInt(diskLimit) || 0;
-  const TB = 1099511627776;
-  const GB = 1073741824;
-  const MB = 1048576;
-  
-  if (diskLimitBytes >= TB) {
-    document.getElementById('editDiskLimitValue').value = Math.round(diskLimitBytes / TB * 100) / 100;
-    document.getElementById('editDiskLimitUnit').value = TB.toString();
-  } else if (diskLimitBytes >= GB) {
-    document.getElementById('editDiskLimitValue').value = Math.round(diskLimitBytes / GB * 100) / 100;
-    document.getElementById('editDiskLimitUnit').value = GB.toString();
-  } else {
-    document.getElementById('editDiskLimitValue').value = diskLimitBytes > 0 ? Math.round(diskLimitBytes / MB * 100) / 100 : '';
-    document.getElementById('editDiskLimitUnit').value = MB.toString();
-  }
-  document.getElementById('editDiskLimit').value = diskLimitBytes;
-  
   const avatarImg = document.getElementById('editUserAvatar');
   if (avatar && avatar !== 'null') {
     avatarImg.src = `/uploads/avatars/${avatar}`;
@@ -544,9 +497,6 @@ function openCreateModal() {
   document.getElementById('createPassword').value = '';
   document.getElementById('createUserAvatar').src = '/images/default-avatar.jpg';
   document.getElementById('createAvatarInput').value = '';
-  document.getElementById('createDiskLimitValue').value = '';
-  document.getElementById('createDiskLimitUnit').value = '1073741824';
-  document.getElementById('createDiskLimit').value = '0';
   
   const modal = document.getElementById('createModal');
   const modalContent = document.getElementById('createModalContent');
@@ -615,24 +565,9 @@ document.getElementById('createAvatarInput').addEventListener('change', function
   }
 });
 
-function updateDiskLimit(prefix) {
-  const valueInput = document.getElementById(prefix + 'DiskLimitValue');
-  const unitSelect = document.getElementById(prefix + 'DiskLimitUnit');
-  const hiddenInput = document.getElementById(prefix + 'DiskLimit');
-  const value = parseFloat(valueInput.value) || 0;
-  const unit = parseInt(unitSelect.value);
-  hiddenInput.value = Math.round(value * unit);
-}
-
-document.getElementById('editDiskLimitValue').addEventListener('input', () => updateDiskLimit('edit'));
-document.getElementById('editDiskLimitUnit').addEventListener('change', () => updateDiskLimit('edit'));
-document.getElementById('createDiskLimitValue').addEventListener('input', () => updateDiskLimit('create'));
-document.getElementById('createDiskLimitUnit').addEventListener('change', () => updateDiskLimit('create'));
-
 document.getElementById('editUserForm').addEventListener('submit', function(e) {
   e.preventDefault();
   
-  updateDiskLimit('edit');
   const formData = new FormData(this);
   
   fetch('/api/users/update', {
@@ -658,7 +593,6 @@ document.getElementById('editUserForm').addEventListener('submit', function(e) {
 document.getElementById('createUserForm').addEventListener('submit', function(e) {
   e.preventDefault();
   
-  updateDiskLimit('create');
   const formData = new FormData(this);
   
   fetch('/api/users/create', {

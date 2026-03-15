@@ -30,12 +30,12 @@ const { getVideoInfo, generateThumbnail, generateImageThumbnail } = require('./u
 const Video = require('./models/Video');
 const Playlist = require('./models/Playlist');
 const Stream = require('./models/Stream');
+const Folder = require('./models/Folder');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const streamingService = require('./services/streamingService');
 const schedulerService = require('./services/schedulerService');
 const packageJson = require('./package.json');
-const { getOverlaySettings, saveOverlaySettings } = require('./models/overlayModel');
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 process.on('unhandledRejection', (reason, promise) => {
   console.error('-----------------------------------');
@@ -52,21 +52,23 @@ const app = express();
 app.set("trust proxy", 1);
 const port = process.env.PORT || 7575;
 const tokens = new csrf();
-const overlayStorage = multer.diskStorage({
+const logoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const dir = 'public/uploads/overlay';
-    fs.mkdirSync(dir, { recursive: true });
+    const dir = path.join(__dirname, 'public/uploads/logos');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    cb(null, `overlay_${req.session.userId}${ext}`);
+    cb(null, `logo_${req.params.id}_${Date.now()}${ext}`);
   }
 });
-const overlayUpload = multer({
-  storage: overlayStorage,
+
+const uploadLogo = multer({
+  storage: logoStorage,
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
   fileFilter: (req, file, cb) => {
-    const allowed = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+    const allowed = ['.png', '.jpg', '.gif', '.webp'];
     cb(null, allowed.includes(path.extname(file.originalname).toLowerCase()));
   }
 });
@@ -654,65 +656,6 @@ app.post('/setup-account', upload.single('avatar'), [
 app.get('/', (req, res) => {
   res.redirect('/dashboard');
 });
-
-// GET - halaman pengaturan overlay
-app.get('/overlay', isAuthenticated, async (req, res) => {
-  try {
-    const settings = getOverlaySettings(req.session.userId) || {};
-    const user = await User.findById(req.session.userId);
-    res.render('overlay', {
-      title: 'Overlay Logo',
-      active: 'overlay',
-      user: user,
-      settings
-    });
-  } catch (error) {
-    console.error('Overlay error:', error);
-    res.redirect('/dashboard');
-  }
-});
-
-// POST - simpan pengaturan
-app.post('/overlay/settings', isAuthenticated, (req, res) => {
-  const { enabled, position_x, position_y, width, height, opacity } = req.body;
-  const existing = getOverlaySettings(req.session.userId);
-
-  saveOverlaySettings(req.session.userId, {
-    enabled: enabled === 'on' || enabled === '1',
-    image_path: existing?.image_path ?? null,
-    position_x: parseInt(position_x) || 10,
-    position_y: parseInt(position_y) || 10,
-    width: parseInt(width) || 150,
-    height: parseInt(height) || 150,
-    opacity: parseFloat(opacity) || 1.0
-  });
-
-  res.json({ success: true });
-});
-
-// POST - upload gambar overlay
-app.post('/overlay/upload', isAuthenticated, overlayUpload.single('logo'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'File tidak valid' });
-
-  const existing = getOverlaySettings(req.session.userId);
-  saveOverlaySettings(req.session.userId, {
-    ...(existing || {}),
-    image_path: req.file.path.replace(/\\/g, '/'),
-    enabled: existing?.enabled ?? 0
-  });
-
-  res.json({ success: true, path: `/${req.file.path}` });
-});
-
-// DELETE - hapus logo
-app.delete('/overlay/logo', isAuthenticated, (req, res) => {
-  const existing = getOverlaySettings(req.session.userId);
-  if (existing?.image_path) {
-    fs.unlink(existing.image_path, () => { });
-    saveOverlaySettings(req.session.userId, { ...existing, image_path: null, enabled: 0 });
-  }
-  res.json({ success: true });
-});
 app.get('/welcome', isAuthenticated, async (req, res) => {
   try {
     const user = await User.findById(req.session.userId);
@@ -1181,8 +1124,7 @@ app.post('/api/users/update', isAdmin, upload.single('avatar'), async (req, res)
       username: username || user.username,
       user_role: role || user.user_role,
       status: status || user.status,
-      avatar_path: avatarPath,
-      disk_limit: diskLimit !== undefined && diskLimit !== '' ? parseInt(diskLimit) : user.disk_limit
+      avatar_path: avatarPath
     };
 
     if (password && password.trim() !== '') {
@@ -1234,8 +1176,7 @@ app.post('/api/users/create', isAdmin, upload.single('avatar'), async (req, res)
       password: password,
       user_role: role || 'user',
       status: status || 'active',
-      avatar_path: avatarPath,
-      disk_limit: diskLimit ? parseInt(diskLimit) : 0
+      avatar_path: avatarPath
     };
 
     const result = await User.create(userData);
@@ -1282,8 +1223,7 @@ app.get('/api/user/disk-usage', isAuthenticated, async (req, res) => {
     const diskUsage = await User.getDiskUsage(req.session.userId);
     res.json({
       success: true,
-      diskUsage: diskUsage,
-      diskLimit: user.disk_limit || 0
+      diskUsage: diskUsage
     });
   } catch (error) {
     console.error('Get disk usage error:', error);
@@ -1623,23 +1563,6 @@ app.post('/api/videos/upload', isAuthenticated, (req, res, next) => {
       });
     }
 
-    const user = await User.findById(req.session.userId);
-    if (user.disk_limit > 0) {
-      const currentUsage = await User.getDiskUsage(req.session.userId);
-      const newTotal = currentUsage + req.file.size;
-      if (newTotal > user.disk_limit) {
-        const fs = require('fs');
-        const fullFilePath = path.join(__dirname, 'public', 'uploads', 'videos', req.file.filename);
-        if (fs.existsSync(fullFilePath)) {
-          fs.unlinkSync(fullFilePath);
-        }
-        return res.status(400).json({
-          success: false,
-          error: 'Disk limit exceeded. Please delete some files or contact admin.'
-        });
-      }
-    }
-
     let title = path.parse(req.file.originalname).name;
     const filePath = `/uploads/videos/${req.file.filename}`;
     const fullFilePath = path.join(__dirname, 'public', filePath);
@@ -1758,22 +1681,6 @@ app.post('/api/audio/upload', isAuthenticated, (req, res, next) => {
       });
     }
 
-    const user = await User.findById(req.session.userId);
-    if (user.disk_limit > 0) {
-      const currentUsage = await User.getDiskUsage(req.session.userId);
-      const newTotal = currentUsage + req.file.size;
-      if (newTotal > user.disk_limit) {
-        const uploadedPath = path.join(__dirname, 'public', 'uploads', 'audio', req.file.filename);
-        if (fs.existsSync(uploadedPath)) {
-          fs.unlinkSync(uploadedPath);
-        }
-        return res.status(400).json({
-          success: false,
-          error: 'Disk limit exceeded. Please delete some files or contact admin.'
-        });
-      }
-    }
-
     let title = path.parse(req.file.originalname).name;
     const uploadedPath = path.join(__dirname, 'public', 'uploads', 'audio', req.file.filename);
     const result = await audioConverter.processAudioFile(uploadedPath, req.file.originalname);
@@ -1821,18 +1728,6 @@ app.post('/api/videos/chunk/init', isAuthenticated, async (req, res) => {
     const ext = path.extname(filename).toLowerCase();
     if (!allowedExts.includes(ext)) {
       return res.status(400).json({ success: false, error: `File format not allowed. Only ${allowedExts.join(', ')} are allowed.` });
-    }
-
-    const user = await User.findById(req.session.userId);
-    if (user.disk_limit > 0) {
-      const currentUsage = await User.getDiskUsage(req.session.userId);
-      const newTotal = currentUsage + parseInt(fileSize);
-      if (newTotal > user.disk_limit) {
-        return res.status(400).json({
-          success: false,
-          error: 'Disk limit exceeded. Please delete some files or contact admin.'
-        });
-      }
     }
 
     const info = await chunkUploadService.initUpload(filename, fileSize, totalChunks, req.session.userId);
@@ -3109,7 +3004,8 @@ app.get('/api/stream/content', isAuthenticated, async (req, res) => {
         resolution: video.resolution || '1280x720',
         duration: formattedDuration,
         url: `/stream/${video.id}`,
-        type: 'video'
+        type: 'video',
+        folder_id: video.folder_id || null
       };
     });
 
@@ -4126,6 +4022,286 @@ app.get('/api/server-time', (req, res) => {
 const Rotation = require('./models/Rotation');
 const rotationService = require('./services/rotationService');
 
+// ================================================================
+// FOLDER ROUTES
+// ================================================================
+ 
+/**
+ * GET /api/folders
+ * Ambil semua folder milik user yang sedang login.
+ */
+app.get('/api/folders', isAuthenticated, async (req, res) => {
+  try {
+    const folders = await Folder.findAll(req.session.userId);
+    res.json({ success: true, folders });
+  } catch (error) {
+    console.error('Error fetching folders:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch folders' });
+  }
+});
+ 
+/**
+ * POST /api/folders
+ * Buat folder baru.
+ * Body: { name, parent_id? }
+ */
+app.post('/api/folders', isAuthenticated, [
+  body('name').trim().isLength({ min: 1 }).withMessage('Folder name is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, error: errors.array()[0].msg });
+    }
+ 
+    const { name, parent_id } = req.body;
+ 
+    // Validasi parent_id milik user yang sama
+    if (parent_id) {
+      const parentFolder = await Folder.findById(parent_id);
+      if (!parentFolder || parentFolder.user_id !== req.session.userId) {
+        return res.status(404).json({ success: false, error: 'Parent folder not found' });
+      }
+    }
+ 
+    const folder = await Folder.create({
+      name,
+      parent_id: parent_id || null,
+      user_id: req.session.userId
+    });
+ 
+    res.json({ success: true, folder });
+  } catch (error) {
+    console.error('Error creating folder:', error);
+    res.status(500).json({ success: false, error: 'Failed to create folder' });
+  }
+});
+ 
+/**
+ * PUT /api/folders/:id
+ * Rename folder.
+ * Body: { name }
+ */
+app.put('/api/folders/:id', isAuthenticated, [
+  body('name').trim().isLength({ min: 1 }).withMessage('Folder name is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, error: errors.array()[0].msg });
+    }
+ 
+    const folder = await Folder.findById(req.params.id);
+    if (!folder) {
+      return res.status(404).json({ success: false, error: 'Folder not found' });
+    }
+    if (folder.user_id !== req.session.userId) {
+      return res.status(403).json({ success: false, error: 'Not authorized' });
+    }
+ 
+    const updated = await Folder.update(req.params.id, { name: req.body.name });
+    res.json({ success: true, folder: updated });
+  } catch (error) {
+    console.error('Error renaming folder:', error);
+    res.status(500).json({ success: false, error: 'Failed to rename folder' });
+  }
+});
+ 
+/**
+ * DELETE /api/folders/:id
+ * Hapus folder beserta seluruh subfolder dan file di dalamnya.
+ * File di dalam folder akan di-set folder_id = NULL (tidak dihapus dari disk).
+ * Jika ingin file juga terhapus dari disk, lihat komentar di dalam Folder.deleteRecursive.
+ */
+app.delete('/api/folders/:id', isAuthenticated, async (req, res) => {
+  try {
+    const folder = await Folder.findById(req.params.id);
+    if (!folder) {
+      return res.status(404).json({ success: false, error: 'Folder not found' });
+    }
+    if (folder.user_id !== req.session.userId) {
+      return res.status(403).json({ success: false, error: 'Not authorized' });
+    }
+ 
+    const result = await Folder.deleteRecursive(req.params.id, req.session.userId);
+    res.json({
+      success: true,
+      message: 'Folder deleted successfully',
+      deletedFolderIds: result.folderIds
+    });
+  } catch (error) {
+    console.error('Error deleting folder:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete folder' });
+  }
+});
+ 
+ 
+// ================================================================
+// VIDEO MOVE & COPY ROUTES
+// ================================================================
+ 
+/**
+ * POST /api/videos/:id/move
+ * Pindahkan video ke folder tujuan.
+ * Body: { folder_id }  — null berarti root
+ */
+app.post('/api/videos/:id/move', isAuthenticated, async (req, res) => {
+  try {
+    const video = await Video.findById(req.params.id);
+    if (!video) {
+      return res.status(404).json({ success: false, error: 'Video not found' });
+    }
+    if (video.user_id !== req.session.userId) {
+      return res.status(403).json({ success: false, error: 'Not authorized' });
+    }
+ 
+    // Gunakan pengecekan eksplisit — folder_id bisa berupa angka, string angka, atau null (root)
+    const rawFolderId = req.body.folder_id;
+    const targetFolderId = (rawFolderId !== undefined && rawFolderId !== '' && rawFolderId !== null)
+      ? rawFolderId
+      : null;
+ 
+    // Validasi folder tujuan
+    if (targetFolderId !== null) {
+      const targetFolder = await Folder.findById(targetFolderId);
+      if (!targetFolder || targetFolder.user_id !== req.session.userId) {
+        return res.status(404).json({ success: false, error: 'Target folder not found' });
+      }
+    }
+ 
+    await Video.update(req.params.id, { folder_id: targetFolderId });
+ 
+    res.json({ success: true, message: 'Video moved successfully' });
+  } catch (error) {
+    console.error('Error moving video:', error);
+    res.status(500).json({ success: false, error: 'Failed to move video' });
+  }
+});
+ 
+/**
+ * POST /api/videos/:id/copy
+ * Salin video ke folder tujuan.
+ * - Jika nama sudah ada di folder tujuan, tambahkan suffix "-copy"
+ *   (atau "-copy-2", "-copy-3", dst.)
+ * - File fisik juga disalin di disk.
+ * Body: { folder_id }  — null berarti root
+ */
+app.post('/api/videos/:id/copy', isAuthenticated, async (req, res) => {
+  try {
+    const video = await Video.findById(req.params.id);
+    if (!video) {
+      return res.status(404).json({ success: false, error: 'Video not found' });
+    }
+    if (video.user_id !== req.session.userId) {
+      return res.status(403).json({ success: false, error: 'Not authorized' });
+    }
+ 
+    // Gunakan pengecekan eksplisit — folder_id bisa berupa angka, string angka, atau null (root)
+    const rawFolderId = req.body.folder_id;
+    const targetFolderId = (rawFolderId !== undefined && rawFolderId !== '' && rawFolderId !== null)
+      ? rawFolderId
+      : null;
+ 
+    // Validasi folder tujuan
+    if (targetFolderId !== null) {
+      const targetFolder = await Folder.findById(targetFolderId);
+      if (!targetFolder || targetFolder.user_id !== req.session.userId) {
+        return res.status(404).json({ success: false, error: 'Target folder not found' });
+      }
+    }
+ 
+    // ---------- Salin file fisik ----------
+    const srcPath = path.join(__dirname, 'public', video.filepath);
+    const ext = path.extname(video.filepath);
+    const baseName = path.basename(video.filepath, ext);
+ 
+    // Generate nama file unik untuk salinan
+    let copyFilename = `${baseName}-copy${ext}`;
+    let copyFilePath = path.join(__dirname, 'public', 'uploads', 'videos', copyFilename);
+    let counter = 2;
+    while (fs.existsSync(copyFilePath)) {
+      copyFilename = `${baseName}-copy-${counter}${ext}`;
+      copyFilePath = path.join(__dirname, 'public', 'uploads', 'videos', copyFilename);
+      counter++;
+    }
+ 
+    await fs.promises.copyFile(srcPath, copyFilePath);
+ 
+    // ---------- Generate thumbnail untuk salinan ----------
+    let newThumbnailPath = video.thumbnail_path;
+    try {
+      const thumbExt = '.jpg';
+      const thumbBaseName = path.basename(copyFilename, ext);
+      const thumbFilename = `thumb-${thumbBaseName}${thumbExt}`;
+      const fullThumbPath = path.join(__dirname, 'public', 'uploads', 'thumbnails', thumbFilename);
+ 
+      await new Promise((resolve) => {
+        ffmpeg(copyFilePath)
+          .screenshots({
+            timestamps: ['10%'],
+            filename: thumbFilename,
+            folder: path.join(__dirname, 'public', 'uploads', 'thumbnails'),
+            size: '854x480'
+          })
+          .on('end', resolve)
+          .on('error', () => resolve()); // thumbnail gagal = tidak fatal
+      });
+ 
+      if (fs.existsSync(fullThumbPath)) {
+        newThumbnailPath = `/uploads/thumbnails/${thumbFilename}`;
+      }
+    } catch (thumbErr) {
+      console.log('Note: Could not generate thumbnail for copy:', thumbErr.message);
+    }
+ 
+    // ---------- Tentukan judul salinan (handle bentrok di tujuan) ----------
+    const allUserVideos = await Video.findAll(req.session.userId);
+    // Normalisasi ke Number untuk perbandingan konsisten, null tetap null
+    const normalizedTarget = targetFolderId !== null ? Number(targetFolderId) : null;
+    const videosInTarget = allUserVideos.filter(v => {
+      const vFolder = v.folder_id !== null && v.folder_id !== undefined ? Number(v.folder_id) : null;
+      return vFolder === normalizedTarget;
+    });
+    const existingTitles = new Set(videosInTarget.map(v => v.title));
+ 
+    let newTitle = `${video.title} - Copy`;
+    if (existingTitles.has(newTitle)) {
+      let titleCounter = 2;
+      while (existingTitles.has(`${video.title} - Copy (${titleCounter})`)) {
+        titleCounter++;
+      }
+      newTitle = `${video.title} - Copy (${titleCounter})`;
+    }
+ 
+    // ---------- Simpan record baru ke database ----------
+    const newVideoData = {
+      title: newTitle,
+      filepath: `/uploads/videos/${copyFilename}`,
+      thumbnail_path: newThumbnailPath,
+      file_size: video.file_size,
+      duration: video.duration,
+      format: video.format,
+      resolution: video.resolution,
+      bitrate: video.bitrate,
+      fps: video.fps,
+      // Gunakan normalizedTarget — JANGAN pakai || karena akan mengubah angka valid 0 ke null
+      folder_id: normalizedTarget,
+      user_id: req.session.userId
+    };
+ 
+    const newVideo = await Video.create(newVideoData);
+ 
+    res.json({
+      success: true,
+      message: 'Video copied successfully',
+      video: newVideo
+    });
+  } catch (error) {
+    console.error('Error copying video:', error);
+    res.status(500).json({ success: false, error: 'Failed to copy video' });
+  }
+});
+
 app.get('/rotations', isAuthenticated, async (req, res) => {
   try {
     const user = await User.findById(req.session.userId);
@@ -4142,6 +4318,7 @@ app.get('/rotations', isAuthenticated, async (req, res) => {
     const youtubeChannels = await YoutubeChannel.findAll(req.session.userId);
     const isYoutubeConnected = youtubeChannels.length > 0;
     const defaultChannel = youtubeChannels.find(c => c.is_default) || youtubeChannels[0];
+    const folders = await Folder.findAll(req.session.userId);
 
     res.render('rotations', {
       title: 'Stream Rotations',
@@ -4150,6 +4327,7 @@ app.get('/rotations', isAuthenticated, async (req, res) => {
       videos: videos,
       playlists: playlists,
       rotations: rotations,
+      folders: folders,
       youtubeConnected: isYoutubeConnected,
       youtubeChannels: youtubeChannels,
       youtubeChannelName: defaultChannel?.channel_name || '',

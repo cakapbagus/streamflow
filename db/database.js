@@ -16,21 +16,6 @@ const db = new sqlite3.Database(dbPath, (err) => {
 function createTables() {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
-      db.run(` CREATE TABLE IF NOT EXISTS overlay_settings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL UNIQUE,
-        enabled INTEGER DEFAULT 0,
-        image_path TEXT,
-        position_x INTEGER DEFAULT 10,
-        position_y INTEGER DEFAULT 10,
-        width INTEGER DEFAULT 150,
-        height INTEGER DEFAULT 150,
-        opacity REAL DEFAULT 1.0,
-        created_at DATETIME DEFAULT (datetime('now')),
-        updated_at DATETIME DEFAULT (datetime('now')),
-        FOREIGN KEY (user_id) REFERENCES users(id)
-      )`);
-
       db.run(`CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,
@@ -59,6 +44,17 @@ function createTables() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id)
+      )`);
+
+      db.run(
+      `CREATE TABLE IF NOT EXISTS folders (
+        id         INTEGER  PRIMARY KEY AUTOINCREMENT,
+        name       TEXT     NOT NULL,
+        parent_id  INTEGER  DEFAULT NULL,
+        user_id    INTEGER  NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id)   REFERENCES users(id)   ON DELETE CASCADE,
+        FOREIGN KEY (parent_id) REFERENCES folders(id) ON DELETE CASCADE
       )`);
       
       db.run(`CREATE TABLE IF NOT EXISTS streams (
@@ -343,6 +339,12 @@ function createTables() {
         }
       });
 
+      db.run(`ALTER TABLE videos ADD COLUMN folder_id INTEGER DEFAULT NULL REFERENCES folders(id) ON DELETE SET NULL`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding folder_id column to videos:', err.message);
+        }
+      });
+
       db.run(`ALTER TABLE streams ADD COLUMN is_youtube_api INTEGER DEFAULT 0`, (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.error('Error adding is_youtube_api column to streams:', err.message);
@@ -353,13 +355,7 @@ function createTables() {
         if (err && !err.message.includes('duplicate column name')) {
           console.error('Error adding welcome_shown column to users:', err.message);
         }
-      });
-
-      db.run(`ALTER TABLE users ADD COLUMN disk_limit INTEGER DEFAULT 0`, (err) => {
-        if (err && !err.message.includes('duplicate column name')) {
-          console.error('Error adding disk_limit column to users:', err.message);
-        }
-      });
+      });     
 
       db.run(`CREATE TABLE IF NOT EXISTS app_settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
