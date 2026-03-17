@@ -3100,7 +3100,7 @@ app.post('/api/streams', isAuthenticated, [
       stream_key: req.body.streamKey,
       platform,
       platform_icon,
-      bitrate: parseInt(req.body.bitrate) || 2500,
+      bitrate: parseInt(req.body.bitrate) || 3500,
       resolution: req.body.resolution || '1280x720',
       fps: parseInt(req.body.fps) || 30,
       orientation: req.body.orientation || 'horizontal',
@@ -3265,6 +3265,32 @@ app.post('/api/streams/youtube', isAuthenticated, uploadThumbnail.single('thumbn
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to create YouTube stream'
+    });
+  }
+});
+
+// PENTING: route spesifik harus sebelum route :id agar tidak di-intercept
+app.get('/api/streams/check-key', isAuthenticated, async (req, res) => {
+  try {
+    const streamKey = req.query.key;
+    const excludeId = req.query.excludeId || null;
+    if (!streamKey) {
+      return res.status(400).json({
+        success: false,
+        error: 'Stream key is required'
+      });
+    }
+    const isInUse = await Stream.isStreamKeyInUse(streamKey, req.session.userId, excludeId);
+    res.json({
+      success: true,
+      isInUse: isInUse,
+      message: isInUse ? 'Stream key is already in use' : 'Stream key is available'
+    });
+  } catch (error) {
+    console.error('Error checking stream key:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check stream key'
     });
   }
 });
@@ -3695,30 +3721,6 @@ app.post('/api/streams/:id/status', isAuthenticated, [
   } catch (error) {
     console.error('Error updating stream status:', error);
     res.status(500).json({ success: false, error: 'Failed to update stream status' });
-  }
-});
-app.get('/api/streams/check-key', isAuthenticated, async (req, res) => {
-  try {
-    const streamKey = req.query.key;
-    const excludeId = req.query.excludeId || null;
-    if (!streamKey) {
-      return res.status(400).json({
-        success: false,
-        error: 'Stream key is required'
-      });
-    }
-    const isInUse = await Stream.isStreamKeyInUse(streamKey, req.session.userId, excludeId);
-    res.json({
-      success: true,
-      isInUse: isInUse,
-      message: isInUse ? 'Stream key is already in use' : 'Stream key is available'
-    });
-  } catch (error) {
-    console.error('Error checking stream key:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to check stream key'
-    });
   }
 });
 app.get('/api/streams/:id/logs', isAuthenticated, async (req, res) => {

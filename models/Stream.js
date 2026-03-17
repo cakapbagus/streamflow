@@ -10,7 +10,7 @@ class Stream {
       stream_key,
       platform,
       platform_icon,
-      bitrate = 2500,
+      bitrate = 3500,
       resolution,
       fps = 30,
       orientation = 'horizontal',

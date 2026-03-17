@@ -65,7 +65,7 @@ function createTables() {
         stream_key TEXT NOT NULL,
         platform TEXT,
         platform_icon TEXT,
-        bitrate INTEGER DEFAULT 2500,
+        bitrate INTEGER DEFAULT 3500,
         resolution TEXT,
         fps INTEGER DEFAULT 30,
         orientation TEXT DEFAULT 'horizontal',

@@ -97,7 +97,7 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
   const hasAudioBg = playlist.audios && playlist.audios.length > 0;
 
   const resolution = stream.use_advanced_settings ? (stream.resolution || '1280x720') : '1280x720';
-  const bitrate = stream.use_advanced_settings ? (stream.bitrate || 2500) : 2500;
+  const bitrate = stream.use_advanced_settings ? (stream.bitrate || 3500) : 3500;
   const fps = stream.use_advanced_settings ? (stream.fps || 30) : 30;
 
   // ─── SEQUENTIAL MODE (tanpa background audio) ────────────────────────────
@@ -231,7 +231,7 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
  * Tidak pakai -stream_loop karena loop dihandle di level sequencer.
  * Video di-normalize ke resolusi/fps/bitrate target agar output stream konsisten.
  */
-function buildFFmpegArgsForSingleVideoInPlaylist(stream, videoPath, { rtmpUrl, resolution, bitrate, fps }) {
+function buildFFmpegArgsForSingleVideoInPlaylist(videoPath, { rtmpUrl, resolution, bitrate, fps }) {
   const [width, height] = resolution.split('x');
 
   // Gunakan scale+pad agar video dengan rasio berbeda tetap fit tanpa crop
@@ -299,7 +299,7 @@ async function buildFFmpegArgs(stream) {
   const loopValue = stream.loop_video ? '-1' : '0';
 
   const resolution = stream.use_advanced_settings ? (stream.resolution || '1280x720') : '1280x720';
-  const bitrate = stream.use_advanced_settings ? (stream.bitrate || 2500) : 2500;
+  const bitrate = stream.use_advanced_settings ? (stream.bitrate || 3500) : 3500;
   const fps = stream.use_advanced_settings ? (stream.fps || 30) : 30;
 
   const [width, height] = resolution.split('x');
@@ -409,7 +409,7 @@ async function startSequentialPlaylist(streamId, stream, config, { isRetry, orig
 
   // Spawn video pertama terlebih dulu secara sinkron agar activeStreams terisi
   // sebelum return, baru sisanya jalan async
-  const firstArgs = buildFFmpegArgsForSingleVideoInPlaylist(stream, videoPaths[0], { rtmpUrl, resolution, bitrate, fps });
+  const firstArgs = buildFFmpegArgsForSingleVideoInPlaylist(videoPaths[0], { rtmpUrl, resolution, bitrate, fps });
   addStreamLog(streamId, `[Seq 1/${totalVideos} R1] Playing: ${path.basename(videoPaths[0])}`);
 
   const firstProc = spawn(ffmpegPath, firstArgs, {
@@ -476,7 +476,7 @@ async function startSequentialPlaylist(streamId, stream, config, { isRetry, orig
           const label = `[Seq ${idx + 1}/${totalVideos} R${round + 1}]`;
           addStreamLog(streamId, `${label} Playing: ${path.basename(videoPath)}`);
 
-          const args = buildFFmpegArgsForSingleVideoInPlaylist(stream, videoPath, { rtmpUrl, resolution, bitrate, fps });
+          const args = buildFFmpegArgsForSingleVideoInPlaylist(videoPath, { rtmpUrl, resolution, bitrate, fps });
           const proc = spawn(ffmpegPath, args, { detached: false, stdio: ['ignore', 'pipe', 'pipe'] });
 
           activeStreams.set(streamId, {

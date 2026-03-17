@@ -296,20 +296,29 @@ function setVideoOrientation(orientation) {
     if (button.getAttribute('onclick').includes(orientation)) { button.classList.add('bg-primary', 'border-primary', 'text-white'); button.classList.remove('bg-dark-700', 'border-gray-600'); }
     else { button.classList.remove('bg-primary', 'border-primary', 'text-white'); button.classList.add('bg-dark-700', 'border-gray-600'); }
   });
-  updateResolutionDisplay();
+  onResolutionChange();
 }
 
-function updateResolutionDisplay() {
+function onResolutionChange() {
   const select = document.getElementById('resolutionSelect');
-  const option = select.options[select.selectedIndex];
-  const resolution = option.getAttribute(`data-${currentOrientation}`);
-  const quality = option.textContent;
-  document.getElementById('currentResolution').textContent = `${resolution} (${quality})`;
+  if (!select) return;
+  const opt = select.options[select.selectedIndex];
+  const res = opt.getAttribute(`data-${currentOrientation}`);
+  const bitrate = opt.getAttribute('data-bitrate');
+  const fps = opt.getAttribute('data-fps');
+  if (res) document.getElementById('currentResolution').textContent = res;
+  const bfEl = document.getElementById('currentBitrateFps');
+  if (bfEl) bfEl.textContent = `${fps}fps • ${bitrate} kbps`;
+  document.getElementById('bitrateSelect').value = bitrate;
+  document.getElementById('fpsSelect').value = fps;
 }
+
+// alias agar backward compat
+function updateResolutionDisplay() { onResolutionChange(); }
 
 document.addEventListener('DOMContentLoaded', () => {
   const resolutionSelect = document.getElementById('resolutionSelect');
-  if (resolutionSelect) { resolutionSelect.addEventListener('change', updateResolutionDisplay); setVideoOrientation('horizontal'); }
+  if (resolutionSelect) { resolutionSelect.addEventListener('change', onResolutionChange); setVideoOrientation('horizontal'); }
 });
 
 function toggleStreamKeyVisibility() {

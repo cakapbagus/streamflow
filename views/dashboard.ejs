@@ -423,42 +423,25 @@
                   </div>
                   <div class="space-y-4">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label class="text-xs text-gray-400 block mb-1">Bitrate</label>
-                        <select name="bitrate" id="bitrateSelect"
-                          class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm">
-                          <option value="2500" selected>2500 kbps</option>
-                          <option value="4000">4000 kbps</option>
-                          <option value="6000">6000 kbps</option>
-                          <option value="8000">8000 kbps</option>
-                          <option value="10000">10000 kbps</option>
-                          <option value="12000">12000 kbps</option>
-                          <option value="15000">15000 kbps</option>
-                          <option value="20000">20000 kbps</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label class="text-xs text-gray-400 block mb-1">Frame Rate</label>
-                        <select name="fps" id="fpsSelect"
-                          class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm">
-                          <option value="30" selected>30 FPS</option>
-                          <option value="60">60 FPS</option>
-                          <option value="120">120 FPS</option>
-                        </select>
-                      </div>
+                      <!-- Hidden fields — diisi otomatis oleh JS -->
+                      <input type="hidden" name="bitrate" id="bitrateSelect" value="3500">
+                      <input type="hidden" name="fps"     id="fpsSelect"     value="30">
                       <div>
                         <label class="text-xs text-gray-400 block mb-1">Resolution</label>
                         <select id="resolutionSelect"
-                          class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm">
-                          <option value="720" selected data-horizontal="1280x720" data-vertical="720x1280">720p HD
-                          </option>
-                          <option value="1080" data-horizontal="1920x1080" data-vertical="1080x1920">1080p Full HD
-                          </option>
-                          <option value="1440" data-horizontal="2560x1440" data-vertical="1440x2560">1440p QHD</option>
-                          <option value="2160" data-horizontal="3840x2160" data-vertical="2160x3840">2160p 4K</option>
+                          class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm"
+                          onchange="onResolutionChange()">
+                          <option value="720p30"  data-horizontal="1280x720"  data-vertical="720x1280"  data-bitrate="3500"  data-fps="30" selected>720p HD</option>
+                          <option value="720p60"  data-horizontal="1280x720"  data-vertical="720x1280"  data-bitrate="5000"  data-fps="60">720p60 HD</option>
+                          <option value="1080p30" data-horizontal="1920x1080" data-vertical="1080x1920" data-bitrate="6000"  data-fps="30">1080p Full HD</option>
+                          <option value="1080p60" data-horizontal="1920x1080" data-vertical="1080x1920" data-bitrate="8000"  data-fps="60">1080p60 Full HD</option>
+                          <option value="1440p30" data-horizontal="2560x1440" data-vertical="1440x2560" data-bitrate="10000" data-fps="30">1440p QHD</option>
+                          <option value="1440p60" data-horizontal="2560x1440" data-vertical="1440x2560" data-bitrate="14000" data-fps="60">1440p60 QHD</option>
                         </select>
                         <div class="text-xs text-gray-500 mt-1">
                           <span id="currentResolution">1280x720</span>
+                          <span>•</span>
+                          <span id="currentBitrateFps">30fps • 3500 kbps</span>
                         </div>
                       </div>
                       <div>
@@ -894,42 +877,25 @@
                   </div>
                   <div class="space-y-4">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label class="text-xs text-gray-400 block mb-1">Bitrate</label>
-                        <select name="bitrate" id="editBitrate"
-                          class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm">
-                          <option value="2500">2500 kbps</option>
-                          <option value="4000">4000 kbps</option>
-                          <option value="6000">6000 kbps</option>
-                          <option value="8000">8000 kbps</option>
-                          <option value="10000">10000 kbps</option>
-                          <option value="12000">12000 kbps</option>
-                          <option value="15000">15000 kbps</option>
-                          <option value="20000">20000 kbps</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label class="text-xs text-gray-400 block mb-1">Frame Rate</label>
-                        <select name="fps" id="editFps"
-                          class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm">
-                          <option value="30">30 FPS</option>
-                          <option value="60">60 FPS</option>
-                          <option value="120">120 FPS</option>
-                        </select>
-                      </div>
+                      <!-- Hidden fields — diisi otomatis oleh JS -->
+                      <input type="hidden" name="bitrate" id="editBitrate" value="3500">
+                      <input type="hidden" name="fps"     id="editFps"     value="30">
                       <div>
                         <label class="text-xs text-gray-400 block mb-1">Resolution</label>
                         <select id="editResolutionSelect"
-                          class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm">
-                          <option value="720" selected data-horizontal="1280x720" data-vertical="720x1280">720p HD
-                          </option>
-                          <option value="1080" data-horizontal="1920x1080" data-vertical="1080x1920">1080p Full HD
-                          </option>
-                          <option value="1440" data-horizontal="2560x1440" data-vertical="1440x2560">1440p QHD</option>
-                          <option value="2160" data-horizontal="3840x2160" data-vertical="2160x3840">2160p 4K</option>
+                          class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm"
+                          onchange="onEditResolutionChange()">
+                          <option value="720p30"  data-horizontal="1280x720"  data-vertical="720x1280"  data-bitrate="3500"  data-fps="30" selected>720p HD</option>
+                          <option value="720p60"  data-horizontal="1280x720"  data-vertical="720x1280"  data-bitrate="5000"  data-fps="60">720p60 HD</option>
+                          <option value="1080p30" data-horizontal="1920x1080" data-vertical="1080x1920" data-bitrate="6000"  data-fps="30">1080p Full HD</option>
+                          <option value="1080p60" data-horizontal="1920x1080" data-vertical="1080x1920" data-bitrate="8000"  data-fps="60">1080p60 Full HD</option>
+                          <option value="1440p30" data-horizontal="2560x1440" data-vertical="1440x2560" data-bitrate="10000" data-fps="30">1440p QHD</option>
+                          <option value="1440p60" data-horizontal="2560x1440" data-vertical="1440x2560" data-bitrate="14000" data-fps="60">1440p60 QHD</option>
                         </select>
                         <div class="text-xs text-gray-500 mt-1">
                           <span id="editCurrentResolution">1280x720</span>
+                          <span>•</span>
+                          <span id="editCurrentBitrateFps">30fps • 3500 kbps</span>
                         </div>
                       </div>
                       <div>
@@ -952,6 +918,10 @@
                 </div>
               </div>
             </div>
+
+            <!-- ── Overlay Panel (Edit Stream) ── -->
+            <div id="editOverlayPanel" class="mt-4 border-t border-gray-700 pt-4">
+              <div id="editOverlayContent"><!-- rendered by renderOverlayPanel('edit') --></div>
             </div>
 
             <div id="editYoutubeStreamForm" class="hidden">
@@ -1718,11 +1688,11 @@
         videoId: document.getElementById('selectedVideoId').value,
         rtmpUrl: document.getElementById('rtmpUrl').value,
         streamKey: document.getElementById('streamKey').value,
-        bitrate: document.querySelector('select[name="bitrate"]').value,
-        fps: document.querySelector('select[name="fps"]').value,
+        bitrate: document.getElementById('bitrateSelect').value,
+        fps: document.getElementById('fpsSelect').value,
         loopVideo: document.querySelector('input[name="loopVideo"]').checked,
         orientation: currentOrientation,
-        resolution: document.getElementById('currentResolution').textContent.split(' ')[0],
+        resolution: document.getElementById('currentResolution').textContent,
         useAdvancedSettings: !document.getElementById('advancedSettingsContent').classList.contains('hidden')
       };
       const scheduleStartTime = document.getElementById('scheduleStartTime').value;
@@ -1941,10 +1911,10 @@
         settingsDisplay = 'Playlist • Loading...';
         fetchPlaylistInfo(stream.video_id, stream.id);
       } else if (stream.use_advanced_settings) {
-        settingsDisplay = `${stream.resolution || '1280x720'} • ${stream.bitrate || '2500'}kbps`;
+        settingsDisplay = `${stream.resolution || '1280x720'} • ${stream.bitrate || '3500'}kbps`;
       } else {
         const videoRes = '1280x720';
-        const videoBitrate = '2500';
+        const videoBitrate = '3500';
         settingsDisplay = `${videoRes} • ${videoBitrate}kbps`;
       }
       let statusBadge = '';
@@ -2017,10 +1987,10 @@
         settingsDisplay = 'Playlist • Loading...';
         fetchPlaylistInfo(stream.video_id, stream.id);
       } else if (stream.use_advanced_settings) {
-        settingsDisplay = `${stream.resolution || '1280x720'} • ${stream.bitrate || '2500'} kbps • ${stream.fps || '30'} FPS`;
+        settingsDisplay = `${stream.resolution || '1280x720'} • ${stream.bitrate || '3500'} kbps • ${stream.fps || '30'} FPS`;
       } else {
         const videoRes = '1280x720';
-        const videoBitrate = '2500';
+        const videoBitrate = '3500';
         const videoFps = '30';
         settingsDisplay = `${videoRes} • ${videoBitrate} kbps • ${videoFps} FPS`;
       }
@@ -2404,9 +2374,6 @@
           showToast('error', `An error occurred while cancelling the schedule: ${error.message}`);
           restoreButtons();
         });
-    }
-    function editStream(streamId) {
-      console.log('Edit stream:', streamId);
     }
     async function deleteStream(streamId) {
       if (!streamId) return;
@@ -3190,11 +3157,19 @@
       }
       
       fetch(`/api/streams/${streamId}`)
-        .then(response => response.json())
+        .then(response => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          return response.json();
+        })
         .then(data => {
           restoreButtons();
           if (data.success) {
-            openEditStreamModal(data.stream);
+            try {
+              openEditStreamModal(data.stream);
+            } catch (e) {
+              console.error('Error opening edit modal:', e);
+              showToast('error', 'Failed to open edit modal: ' + e.message);
+            }
           } else {
             showToast('error', data.error || 'Failed to fetch stream data');
           }
@@ -3333,38 +3308,36 @@
         selectEditVideo(videoData);
       }
       document.getElementById('editLoopVideo').checked = stream.loop_video;
-      const bitrateSelect = document.getElementById('editBitrate');
-      for (let i = 0; i < bitrateSelect.options.length; i++) {
-        if (bitrateSelect.options[i].value == stream.bitrate) {
-          bitrateSelect.selectedIndex = i;
-          break;
-        }
-      }
       currentEditOrientation = stream.orientation || 'horizontal';
       setEditVideoOrientation(currentEditOrientation);
       const resolutionSelect = document.getElementById('editResolutionSelect');
-      if (stream.resolution) {
-        let found = false;
+      if (stream.resolution || stream.bitrate) {
+        // Match berdasarkan resolusi + bitrate + fps sekaligus
+        let matched = false;
         for (let i = 0; i < resolutionSelect.options.length; i++) {
-          const option = resolutionSelect.options[i];
-          const resValue = option.getAttribute(`data-${currentEditOrientation}`);
-          if (resValue === stream.resolution) {
-            resolutionSelect.selectedIndex = i;
-            found = true;
-            break;
+          const opt = resolutionSelect.options[i];
+          const resH = opt.getAttribute('data-horizontal');
+          const resV = opt.getAttribute('data-vertical');
+          const b = opt.getAttribute('data-bitrate');
+          const f = opt.getAttribute('data-fps');
+          const resMatch = stream.resolution && (resH === stream.resolution || resV === stream.resolution);
+          const bitrateMatch = !stream.bitrate || String(b) === String(stream.bitrate);
+          const fpsMatch = !stream.fps || String(f) === String(stream.fps);
+          if (resMatch && bitrateMatch && fpsMatch) {
+            resolutionSelect.selectedIndex = i; matched = true; break;
           }
         }
-        if (!found) {
-          resolutionSelect.value = "720";
+        // Fallback: match resolusi saja
+        if (!matched && stream.resolution) {
+          for (let i = 0; i < resolutionSelect.options.length; i++) {
+            const opt = resolutionSelect.options[i];
+            if (opt.getAttribute('data-horizontal') === stream.resolution || opt.getAttribute('data-vertical') === stream.resolution) {
+              resolutionSelect.selectedIndex = i; matched = true; break;
+            }
+          }
         }
-        updateEditResolutionDisplay();
-      }
-      const fpsSelect = document.getElementById('editFps');
-      for (let i = 0; i < fpsSelect.options.length; i++) {
-        if (fpsSelect.options[i].value == stream.fps) {
-          fpsSelect.selectedIndex = i;
-          break;
-        }
+        if (!matched) resolutionSelect.selectedIndex = 0;
+        onEditResolutionChange();
       }
       if (stream.schedule_time && !isYoutubeStream) {
         const scheduleDate = new Date(stream.schedule_time);
@@ -3673,12 +3646,20 @@
       updateEditResolutionDisplay();
     }
     function updateEditResolutionDisplay() {
+      onEditResolutionChange();
+    }
+    function onEditResolutionChange() {
       const select = document.getElementById('editResolutionSelect');
-      const selected = select.options[select.selectedIndex];
-      const resValue = selected.getAttribute(`data-${currentEditOrientation}`);
-      if (resValue) {
-        document.getElementById('editCurrentResolution').textContent = resValue;
-      }
+      if (!select) return;
+      const opt = select.options[select.selectedIndex];
+      const res = opt.getAttribute(`data-${currentEditOrientation}`);
+      const bitrate = opt.getAttribute('data-bitrate');
+      const fps = opt.getAttribute('data-fps');
+      if (res) document.getElementById('editCurrentResolution').textContent = res;
+      const bfEl = document.getElementById('editCurrentBitrateFps');
+      if (bfEl) bfEl.textContent = `${fps}fps • ${bitrate} kbps`;
+      document.getElementById('editBitrate').value = bitrate;
+      document.getElementById('editFps').value = fps;
     }
     function toggleEditStreamKeyVisibility() {
       const keyInput = document.getElementById('editStreamKey');
@@ -3696,7 +3677,7 @@
     document.addEventListener('DOMContentLoaded', function () {
       const editResolutionSelect = document.getElementById('editResolutionSelect');
       if (editResolutionSelect) {
-        editResolutionSelect.addEventListener('change', updateEditResolutionDisplay);
+        editResolutionSelect.addEventListener('change', onEditResolutionChange);
       }
       const editForm = document.getElementById('editStreamForm');
       if (editForm) {
@@ -4293,6 +4274,8 @@
       const advancedSettingsCheckbox = document.getElementById('advancedSettingsCheckbox');
       const isAdvancedOn = advancedSettingsCheckbox ? advancedSettingsCheckbox.checked : false;
 
+      const panel = document.getElementById('simpleModePanel');
+      if (!panel) return;
       if (isPlaylist && !isAdvancedOn) {
         panel.classList.remove('hidden');
       } else {
@@ -4308,6 +4291,8 @@
       const advancedSettingsCheckbox = document.getElementById('editAdvancedSettingsCheckbox');
       const isAdvancedOn = advancedSettingsCheckbox ? advancedSettingsCheckbox.checked : false;
 
+      const panel = document.getElementById('editSimpleModePanel');
+      if (!panel) return;
       if (isPlaylist && !isAdvancedOn) {
         panel.classList.remove('hidden');
       } else {
