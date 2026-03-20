@@ -19,10 +19,10 @@ error()   { echo -e "${RED}[ERR]${NC}  $*" >&2; exit 1; }
 header()  { echo -e "\n${BOLD}${CYAN}══ $* ══${NC}\n"; }
 
 # ── Require root ──────────────────────────────────────────────
-[[ $EUID -ne 0 ]] && error "Jalankan script ini sebagai root: sudo bash $0"
+[[ $EUID -ne 0 ]] && error "Run this script as root: sudo bash $0"
 
 # =============================================================
-#   KONFIGURASI — edit bagian ini sesuai kebutuhan
+#   CONFIGURATION — edit this section as needed
 # =============================================================
 
 APP_NAME="streamflow"
@@ -32,28 +32,28 @@ BRANCH="main"
 TIMEZONE="Asia/Jakarta"
 NODE_VERSION="22"
 
-# Domain & SSL (akan ditanyakan saat install)
+# Domain & SSL (will be prompted during install)
 DOMAIN=""
 SSL_EMAIL=""
 
-# User yang menjalankan app:
-# - Default: user yang memanggil sudo (SUDO_USER), atau "root" jika langsung login root
-# - Ganti manual jika perlu, contoh: RUN_AS_USER="admin"
+# User that runs the app:
+# - Default: user who called sudo (SUDO_USER), or "root" if logged in directly as root
+# - Override manually if needed, e.g.: RUN_AS_USER="admin"
 RUN_AS_USER="${SUDO_USER:-root}"
 RUN_AS_HOME=$(eval echo "~$RUN_AS_USER")
 APP_DIR="$RUN_AS_HOME/streamflow"
 
 # =============================================================
-#   INTERAKTIF — tanya konfigurasi jika belum diset
+#   INTERACTIVE — prompt for configuration
 # =============================================================
 header "StreamFlow VPS Installer"
-info "App akan dijalankan sebagai user: ${BOLD}$RUN_AS_USER${NC}"
-info "Direktori install: ${BOLD}$APP_DIR${NC}"
+info "App will run as user: ${BOLD}$RUN_AS_USER${NC}"
+info "Install directory: ${BOLD}$APP_DIR${NC}"
 echo
 
-read -rp "Domain (Enter untuk skip / pakai IP saja): " DOMAIN
+read -rp "Domain (press Enter to skip / use IP only): " DOMAIN
 if [[ -n "$DOMAIN" ]]; then
-  read -rp "Email untuk SSL Let's Encrypt (Enter untuk skip SSL): " SSL_EMAIL
+  read -rp "Email for SSL Let's Encrypt (press Enter to skip SSL): " SSL_EMAIL
 fi
 
 # =============================================================
@@ -79,9 +79,9 @@ header "3. Node.js v$NODE_VERSION"
 if command -v node &>/dev/null; then
   CURRENT_NODE=$(node -v | cut -dv -f2 | cut -d. -f1)
   if [[ "$CURRENT_NODE" -ge "$NODE_VERSION" ]]; then
-    success "Node.js sudah terinstall: $(node -v)"
+    success "Node.js already installed: $(node -v)"
   else
-    warn "Node.js $(node -v) terlalu lama — upgrade ke v$NODE_VERSION..."
+    warn "Node.js $(node -v) is outdated — upgrading to v$NODE_VERSION..."
     curl -fsSL "https://deb.nodesource.com/setup_${NODE_VERSION}.x" | bash -
     apt-get install -y nodejs
     success "Node.js upgraded: $(node -v)"
@@ -97,7 +97,7 @@ fi
 # =============================================================
 header "4. FFmpeg"
 if command -v ffmpeg &>/dev/null; then
-  success "FFmpeg sudah terinstall: $(ffmpeg -version 2>&1 | head -1)"
+  success "FFmpeg already installed: $(ffmpeg -version 2>&1 | head -1)"
 else
   apt-get install -y ffmpeg
   success "FFmpeg installed: $(ffmpeg -version 2>&1 | head -1)"
@@ -108,7 +108,7 @@ fi
 # =============================================================
 header "5. PM2"
 if command -v pm2 &>/dev/null; then
-  success "PM2 sudah terinstall: $(pm2 --version)"
+  success "PM2 already installed: $(pm2 --version)"
 else
   npm install -g pm2
   success "PM2 installed: $(pm2 --version)"
@@ -119,7 +119,7 @@ fi
 # =============================================================
 header "6. Nginx"
 if command -v nginx &>/dev/null; then
-  success "Nginx sudah terinstall"
+  success "Nginx already installed"
 else
   apt-get install -y nginx
   systemctl enable nginx
@@ -131,11 +131,11 @@ fi
 # =============================================================
 header "7. Repository"
 if [[ -d "$APP_DIR/.git" ]]; then
-  info "Repo sudah ada — pull update..."
+  info "Repo already exists — pulling updates..."
   sudo -u "$RUN_AS_USER" git -C "$APP_DIR" pull origin "$BRANCH"
   success "Repo updated"
 else
-  info "Clone repo ke $APP_DIR..."
+  info "Cloning repo to $APP_DIR..."
   rm -rf "$APP_DIR"
   sudo -u "$RUN_AS_USER" git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
   success "Repo cloned"
@@ -156,14 +156,14 @@ SESSION_SECRET=$SESSION_SECRET
 ENVEOF
   chown "$RUN_AS_USER":"$RUN_AS_USER" "$ENV_FILE"
   chmod 600 "$ENV_FILE"
-  success ".env dibuat dengan SESSION_SECRET baru"
+  success ".env created with new SESSION_SECRET"
 else
   if ! grep -q "NODE_ENV=production" "$ENV_FILE"; then
     sed -i 's/NODE_ENV=.*/NODE_ENV=production/' "$ENV_FILE" 2>/dev/null \
       || echo "NODE_ENV=production" >> "$ENV_FILE"
     success ".env: NODE_ENV → production"
   else
-    success ".env sudah ada, tidak ditimpa"
+    success ".env already exists, not overwritten"
   fi
 fi
 
@@ -172,12 +172,12 @@ fi
 # =============================================================
 header "9. Dependencies"
 sudo -u "$RUN_AS_USER" bash -c "cd '$APP_DIR' && npm install --omit=dev --no-fund --no-audit"
-success "npm install selesai"
+success "npm install complete"
 
 # =============================================================
-#   10. DIREKTORI & PERMISSIONS
+#   10. DIRECTORIES & PERMISSIONS
 # =============================================================
-header "10. Direktori upload"
+header "10. Upload directories"
 for DIR in \
   "$APP_DIR/public/uploads/videos" \
   "$APP_DIR/public/uploads/thumbnails" \
@@ -190,7 +190,7 @@ for DIR in \
 done
 chown -R "$RUN_AS_USER":"$RUN_AS_USER" "$APP_DIR"
 chmod -R 755 "$APP_DIR/public/uploads"
-success "Direktori siap"
+success "Directories ready"
 
 # =============================================================
 #   11. PM2 ECOSYSTEM
@@ -219,24 +219,24 @@ module.exports = {
 };
 ECOEOF
 chown "$RUN_AS_USER":"$RUN_AS_USER" "$APP_DIR/ecosystem.config.js"
-success "ecosystem.config.js dibuat"
+success "ecosystem.config.js created"
 
-# Jalankan / restart app sebagai RUN_AS_USER
+# Start / restart app as RUN_AS_USER
 if sudo -u "$RUN_AS_USER" pm2 list 2>/dev/null | grep -q "$APP_NAME"; then
   sudo -u "$RUN_AS_USER" pm2 reload "$APP_NAME"
-  success "App di-reload"
+  success "App reloaded"
 else
   sudo -u "$RUN_AS_USER" bash -c "cd '$APP_DIR' && pm2 start ecosystem.config.js"
   success "App started"
 fi
 
 sudo -u "$RUN_AS_USER" pm2 save
-# Setup PM2 startup agar auto-start saat reboot
+# Setup PM2 startup so it auto-starts on reboot
 PM2_STARTUP_CMD=$(sudo -u "$RUN_AS_USER" pm2 startup systemd -u "$RUN_AS_USER" --hp "$RUN_AS_HOME" 2>/dev/null | grep "sudo env" || true)
 if [[ -n "$PM2_STARTUP_CMD" ]]; then
   eval "$PM2_STARTUP_CMD"
 fi
-success "PM2 startup configured (auto-start saat reboot)"
+success "PM2 startup configured (auto-start on reboot)"
 
 # =============================================================
 #   12. NGINX CONFIG
@@ -248,7 +248,7 @@ SERVER_NAME="${DOMAIN:-_}"
 
 cat > "$NGINX_CONF" <<NGINXEOF
 # StreamFlow - Nginx config
-# Auto-generated by VPS-deploy-ubuntu.sh
+# Auto-generated by VPS-deploy-ubuntu-eng.sh
 
 client_max_body_size 20M;
 
@@ -267,7 +267,7 @@ server {
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
     gzip_min_length 1024;
 
-    # Proxy ke Node.js
+    # Proxy to Node.js
     location / {
         proxy_pass http://127.0.0.1:$APP_PORT;
         proxy_http_version 1.1;
@@ -283,7 +283,7 @@ server {
         proxy_send_timeout 300s;
     }
 
-    # Upload chunked — timeout panjang, tanpa buffering
+    # Chunked upload — long timeout, no buffering
     location /api/upload {
         proxy_pass http://127.0.0.1:$APP_PORT;
         proxy_http_version 1.1;
@@ -297,7 +297,7 @@ server {
         proxy_send_timeout 600s;
     }
 
-    # Static files — cache lama
+    # Static files — long cache
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)\$ {
         proxy_pass http://127.0.0.1:$APP_PORT;
         proxy_set_header Host \$host;
@@ -314,7 +314,7 @@ nginx -t && systemctl reload nginx
 success "Nginx configured"
 
 # =============================================================
-#   13. SSL (Let's Encrypt) — hanya jika domain diisi
+#   13. SSL (Let's Encrypt) — only if domain is provided
 # =============================================================
 header "13. SSL / HTTPS"
 if [[ -n "$DOMAIN" && -n "$SSL_EMAIL" ]]; then
@@ -323,9 +323,9 @@ if [[ -n "$DOMAIN" && -n "$SSL_EMAIL" ]]; then
   fi
   certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$SSL_EMAIL" --redirect
   systemctl enable certbot.timer 2>/dev/null || true
-  success "SSL aktif untuk $DOMAIN"
+  success "SSL enabled for $DOMAIN"
 else
-  warn "DOMAIN tidak diisi — SSL dilewati. App bisa diakses via HTTP."
+  warn "No domain provided — SSL skipped. App is accessible via HTTP."
 fi
 
 # =============================================================
@@ -338,7 +338,7 @@ ufw default allow outgoing
 ufw allow ssh
 ufw allow http
 ufw allow https
-ufw allow "$APP_PORT/tcp"   # fallback akses langsung tanpa Nginx
+ufw allow "$APP_PORT/tcp"   # fallback direct access without Nginx
 ufw --force enable
 success "UFW configured"
 ufw status numbered
@@ -370,45 +370,45 @@ $APP_DIR/logs/*.log {
     endscript
 }
 LOGEOF
-success "Log rotation configured (14 hari)"
+success "Log rotation configured (14 days)"
 
 # =============================================================
-#   [OPSIONAL] USER NON-ROOT TERPISAH
-#   Hapus komentar blok di bawah jika ingin membuat user
-#   khusus (selain admin) untuk keamanan tambahan.
+#   [OPTIONAL] SEPARATE NON-ROOT USER
+#   Uncomment the block below to create a dedicated service user
+#   (instead of admin) for additional security.
 # =============================================================
 # EXTRA_USER="streamflow-svc"
 # if ! id "$EXTRA_USER" &>/dev/null; then
 #   useradd --system --shell /bin/false "$EXTRA_USER"
 #   usermod -aG "$EXTRA_USER" "$RUN_AS_USER"
-#   success "User '$EXTRA_USER' dibuat"
+#   success "User '$EXTRA_USER' created"
 # fi
 
 # =============================================================
-#   SELESAI
+#   DONE
 # =============================================================
 SERVER_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
 
 echo
 echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${GREEN}║        DEPLOY SELESAI!                   ║${NC}"
+echo -e "${BOLD}${GREEN}║        DEPLOY COMPLETE!                  ║${NC}"
 echo -e "${BOLD}${GREEN}╚══════════════════════════════════════════╝${NC}"
 echo
 if [[ -n "$DOMAIN" ]]; then
-  echo -e "  ${BOLD}URL:${NC}        https://$DOMAIN"
+  echo -e "  ${BOLD}URL:${NC}          https://$DOMAIN"
 fi
-echo -e "  ${BOLD}URL IP:${NC}     http://$SERVER_IP"
-echo -e "  ${BOLD}Port langsung:${NC} http://$SERVER_IP:$APP_PORT"
-echo -e "  ${BOLD}User:${NC}       $RUN_AS_USER"
-echo -e "  ${BOLD}App dir:${NC}    $APP_DIR"
+echo -e "  ${BOLD}URL (IP):${NC}     http://$SERVER_IP"
+echo -e "  ${BOLD}Direct port:${NC}  http://$SERVER_IP:$APP_PORT"
+echo -e "  ${BOLD}User:${NC}         $RUN_AS_USER"
+echo -e "  ${BOLD}App dir:${NC}      $APP_DIR"
 echo
-echo -e "  ${BOLD}PM2 status:${NC}  pm2 status"
-echo -e "  ${BOLD}PM2 logs:${NC}    pm2 logs $APP_NAME"
-echo -e "  ${BOLD}Restart:${NC}     pm2 restart $APP_NAME"
-echo -e "  ${BOLD}Update app:${NC}  cd $APP_DIR && git pull && npm install --omit=dev && pm2 restart $APP_NAME"
+echo -e "  ${BOLD}PM2 status:${NC}   pm2 status"
+echo -e "  ${BOLD}PM2 logs:${NC}     pm2 logs $APP_NAME"
+echo -e "  ${BOLD}Restart:${NC}      pm2 restart $APP_NAME"
+echo -e "  ${BOLD}Update app:${NC}   cd $APP_DIR && git pull && npm install --omit=dev && pm2 restart $APP_NAME"
 echo
-echo -e "  ${BOLD}Langkah selanjutnya:${NC}"
-echo -e "  1. Buka URL di browser"
-echo -e "  2. Buat akun pertama (admin)"
-echo -e "  3. Sign Out lalu login kembali untuk sinkronisasi database"
+echo -e "  ${BOLD}Next steps:${NC}"
+echo -e "  1. Open the URL in your browser"
+echo -e "  2. Create the first account (admin)"
+echo -e "  3. Sign out then log back in to sync the database"
 echo
