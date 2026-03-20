@@ -32,6 +32,13 @@
   </div>
 </div>
 
+<div class="mt-6 pb-4 border-b border-gray-700/50 flex items-center justify-center lg:hidden">
+  <a href="/normalization" class="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">
+    <span>How to normalize your video</span>
+    <i class="ti ti-arrow-right text-xs"></i>
+  </a>
+</div>
+
 <div id="playlistsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
   <% if (playlists && playlists.length > 0) { %>
     <% playlists.forEach(function(playlist) { 
@@ -175,6 +182,12 @@
           </div>
 
           <div id="videosTab">
+            <div id="resolutionWarningBanner" class="hidden mb-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-lg px-4 py-3 text-sm">
+              <i class="ti ti-alert-triangle flex-shrink-0 mt-0.5"></i>
+              <span><strong>Important:</strong> All videos in the playlist must have the same resolution and constant frame rate (FPS).
+                Make sure to normalize your videos before adding them.
+                Follow <a href="/normalization" class="underline">the normalization guidelines</a> for the best results.</span>
+            </div>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
                 <div class="flex items-center justify-between mb-2">
@@ -244,10 +257,6 @@
           </div>
 
           <div id="audiosTab" class="hidden">
-            <div id="bgMusicWarningBanner" class="hidden mb-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-lg px-4 py-3 text-sm">
-              <i class="ti ti-alert-triangle flex-shrink-0 mt-0.5"></i>
-              <span><strong>Important:</strong> When background music is selected, all videos in the playlist must have the <strong>same resolution and frame rate (FPS)</strong>. Mismatched videos will cause streaming errors.</span>
-            </div>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
                 <div class="flex items-center justify-between mb-2">
@@ -496,13 +505,13 @@ function updateBadges() {
     audioBadge.classList.remove('bg-primary/20', 'text-primary');
   }
 
-  // Show/hide background music warning banner
-  const bgMusicBanner = document.getElementById('bgMusicWarningBanner');
-  if (bgMusicBanner) {
-    if (selectedAudios.length > 0) {
-      bgMusicBanner.classList.remove('hidden');
+  // Show/hide resolution/FPS warning banner (always applies when ≥2 videos)
+  const resolutionBanner = document.getElementById('resolutionWarningBanner');
+  if (resolutionBanner) {
+    if (selectedVideos.length >= 2) {
+      resolutionBanner.classList.remove('hidden');
     } else {
-      bgMusicBanner.classList.add('hidden');
+      resolutionBanner.classList.add('hidden');
     }
   }
 }
@@ -807,23 +816,30 @@ function viewPlaylist(playlistId) {
     });
 }
 
-function deletePlaylist(playlistId, playlistName) {
-  if (confirm(`Are you sure you want to delete "${playlistName}"?`)) {
-    fetch(`/api/playlists/${playlistId}`, { method: 'DELETE' })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          showToast('Playlist deleted successfully', 'success');
-          location.reload();
-        } else {
-          showToast(data.message || 'Error deleting playlist', 'error');
-        }
-      })
-      .catch(error => {
-        console.error('Error deleting playlist:', error);
-        showToast('Error deleting playlist', 'error');
-      });
-  }
+async function deletePlaylist(playlistId, playlistName) {
+  const result = await createModalDialog({
+    type: 'danger',
+    icon: 'ti-trash',
+    title: 'Delete Playlist',
+    message: `Are you sure you want to delete "${playlistName}"? This action cannot be undone.`,
+    confirmText: 'Delete',
+    confirmClass: 'bg-red-500 hover:bg-red-600'
+  });
+  if (!result.confirmed) return;
+  fetch(`/api/playlists/${playlistId}`, { method: 'DELETE' })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        showToast('Playlist deleted successfully', 'success');
+        location.reload();
+      } else {
+        showToast(data.message || 'Error deleting playlist', 'error');
+      }
+    })
+    .catch(error => {
+      console.error('Error deleting playlist:', error);
+      showToast('Error deleting playlist', 'error');
+    });
 }
 
 function submitPlaylist() {
@@ -838,8 +854,8 @@ function submitPlaylist() {
     return;
   }
 
-  // Validate resolution & FPS consistency when background music is selected
-  if (selectedAudios.length > 0 && selectedVideos.length > 1) {
+  // Validate resolution & FPS consistency for all playlists
+  if (selectedVideos.length > 1) {
     const firstResolution = selectedVideos[0].resolution;
     const firstFps = selectedVideos[0].fps;
     const mismatchedVideos = selectedVideos.filter(
@@ -847,7 +863,7 @@ function submitPlaylist() {
     );
     if (mismatchedVideos.length > 0) {
       showToast(
-        `Resolution/FPS mismatch detected. All videos must have same resolution and FPS when background music is used`,
+        `Resolution/FPS mismatch detected. All videos must have the same resolution and FPS.`,
         'error',
         6000
       );
@@ -890,6 +906,49 @@ function submitPlaylist() {
 
 document.getElementById('searchVideos').addEventListener('input', updateAvailableVideosDisplay);
 document.getElementById('searchAudios').addEventListener('input', updateAvailableAudiosDisplay);
+
+function createModalDialog(options) {
+  const dialog = document.createElement('div');
+  dialog.id = 'custom-modal';
+  dialog.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm';
+  const themes = {
+    'info': { icon: options.icon || 'ti-info-circle', color: 'text-primary', bg: 'bg-primary/10', button: 'bg-primary hover:bg-blue-600' },
+    'danger': { icon: options.icon || 'ti-alert-triangle', color: 'text-red-400', bg: 'bg-red-500/10', button: 'bg-red-500 hover:bg-red-600' }
+  };
+  const theme = themes[options.type || 'info'];
+  dialog.innerHTML = `
+    <div class="max-w-md w-full mx-4">
+      <div class="bg-dark-800 rounded-lg shadow-xl overflow-hidden">
+        <div class="p-6">
+          <div class="flex items-start gap-4">
+            <div class="w-12 h-12 rounded-full ${theme.bg} flex items-center justify-center shrink-0">
+              <i class="ti ${theme.icon} ${theme.color} text-2xl"></i>
+            </div>
+            <div class="flex-1">
+              <h3 class="text-lg font-semibold">${options.title}</h3>
+              <p class="text-gray-400 text-sm mt-1">${options.message}</p>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 p-4 border-t border-gray-700">
+          <button id="modal-cancel-btn" class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg transition-colors">Cancel</button>
+          <button id="modal-confirm-btn" class="${options.confirmClass || theme.button} px-4 py-2 text-white rounded-lg transition-colors">${options.confirmText || 'Confirm'}</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(dialog);
+  document.body.classList.add('overflow-hidden');
+  return new Promise((resolve) => {
+    const close = (confirmed = false) => {
+      document.body.classList.remove('overflow-hidden');
+      dialog.remove();
+      resolve({ confirmed });
+    };
+    document.getElementById('modal-confirm-btn').addEventListener('click', () => close(true));
+    document.getElementById('modal-cancel-btn').addEventListener('click', () => close());
+    dialog.addEventListener('click', (e) => { if (e.target === dialog) close(); });
+  });
+}
 
 function showToast(message, type = 'info', duration = 3000) {
   const toast = document.createElement('div');

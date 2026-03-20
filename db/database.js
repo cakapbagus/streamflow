@@ -65,7 +65,7 @@ function createTables() {
         stream_key TEXT NOT NULL,
         platform TEXT,
         platform_icon TEXT,
-        bitrate INTEGER DEFAULT 3500,
+        bitrate INTEGER DEFAULT 3000,
         resolution TEXT,
         fps INTEGER DEFAULT 30,
         orientation TEXT DEFAULT 'horizontal',
@@ -355,7 +355,83 @@ function createTables() {
         if (err && !err.message.includes('duplicate column name')) {
           console.error('Error adding welcome_shown column to users:', err.message);
         }
-      });     
+      });
+
+      // Overlay logo & scrolling text columns for streams
+      ['overlay_logo_path', 'overlay_logo_position', 'scrolling_text', 'scrolling_text_color'].forEach(col => {
+        db.run(`ALTER TABLE streams ADD COLUMN ${col} TEXT`, (err) => {
+          if (err && !err.message.includes('duplicate column name')) {
+            console.error(`Error adding ${col} to streams:`, err.message);
+          }
+        });
+      });
+      ['overlay_logo_scale', 'overlay_logo_opacity'].forEach(col => {
+        db.run(`ALTER TABLE streams ADD COLUMN ${col} REAL`, (err) => {
+          if (err && !err.message.includes('duplicate column name')) {
+            console.error(`Error adding ${col} to streams:`, err.message);
+          }
+        });
+      });
+      ['scrolling_text_speed', 'scrolling_text_size'].forEach(col => {
+        db.run(`ALTER TABLE streams ADD COLUMN ${col} INTEGER`, (err) => {
+          if (err && !err.message.includes('duplicate column name')) {
+            console.error(`Error adding ${col} to streams:`, err.message);
+          }
+        });
+      });
+      db.run(`ALTER TABLE streams ADD COLUMN scrolling_text_position TEXT DEFAULT 'bottom'`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding scrolling_text_position to streams:', err.message);
+        }
+      });
+      db.run(`ALTER TABLE streams ADD COLUMN scrolling_text_bg_color TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding scrolling_text_bg_color to streams:', err.message);
+        }
+      });
+      db.run(`ALTER TABLE streams ADD COLUMN scrolling_text_bg_opacity INTEGER DEFAULT 80`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding scrolling_text_bg_opacity to streams:', err.message);
+        }
+      });
+
+      // Overlay logo & scrolling text columns for stream_rotations
+      ['overlay_logo_path', 'overlay_logo_position', 'scrolling_text', 'scrolling_text_color'].forEach(col => {
+        db.run(`ALTER TABLE stream_rotations ADD COLUMN ${col} TEXT`, (err) => {
+          if (err && !err.message.includes('duplicate column name')) {
+            console.error(`Error adding ${col} to stream_rotations:`, err.message);
+          }
+        });
+      });
+      ['overlay_logo_scale', 'overlay_logo_opacity'].forEach(col => {
+        db.run(`ALTER TABLE stream_rotations ADD COLUMN ${col} REAL`, (err) => {
+          if (err && !err.message.includes('duplicate column name')) {
+            console.error(`Error adding ${col} to stream_rotations:`, err.message);
+          }
+        });
+      });
+      ['scrolling_text_speed', 'scrolling_text_size'].forEach(col => {
+        db.run(`ALTER TABLE stream_rotations ADD COLUMN ${col} INTEGER`, (err) => {
+          if (err && !err.message.includes('duplicate column name')) {
+            console.error(`Error adding ${col} to stream_rotations:`, err.message);
+          }
+        });
+      });
+      db.run(`ALTER TABLE stream_rotations ADD COLUMN scrolling_text_position TEXT DEFAULT 'bottom'`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding scrolling_text_position to stream_rotations:', err.message);
+        }
+      });
+      db.run(`ALTER TABLE stream_rotations ADD COLUMN scrolling_text_bg_color TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding scrolling_text_bg_color to stream_rotations:', err.message);
+        }
+      });
+      db.run(`ALTER TABLE stream_rotations ADD COLUMN scrolling_text_bg_opacity INTEGER DEFAULT 80`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding scrolling_text_bg_opacity to stream_rotations:', err.message);
+        }
+      });
 
       db.run(`CREATE TABLE IF NOT EXISTS app_settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

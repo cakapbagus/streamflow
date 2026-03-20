@@ -13,14 +13,29 @@ class Rotation {
       start_time = null,
       end_time = null,
       repeat_mode = 'daily',
-      youtube_channel_id = null
+      youtube_channel_id = null,
+      overlay_logo_path = null,
+      overlay_logo_position = 'bottom-right',
+      overlay_logo_scale = null,
+      overlay_logo_opacity = null,
+      scrolling_text = null,
+      scrolling_text_speed = null,
+      scrolling_text_position = 'bottom',
+      scrolling_text_color = null,
+      scrolling_text_bg_color = null,
+      scrolling_text_bg_opacity = 80,
+      scrolling_text_size = null
     } = rotationData;
 
     return new Promise((resolve, reject) => {
       db.run(
-        `INSERT INTO stream_rotations (id, user_id, name, gap_minutes, is_loop, status, start_time, end_time, repeat_mode, youtube_channel_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, user_id, name, gap_minutes, is_loop ? 1 : 0, status, start_time, end_time, repeat_mode, youtube_channel_id],
+        `INSERT INTO stream_rotations (id, user_id, name, gap_minutes, is_loop, status, start_time, end_time, repeat_mode, youtube_channel_id,
+          overlay_logo_path, overlay_logo_position, overlay_logo_scale, overlay_logo_opacity,
+          scrolling_text, scrolling_text_speed, scrolling_text_position, scrolling_text_color, scrolling_text_bg_color, scrolling_text_bg_opacity, scrolling_text_size)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, user_id, name, gap_minutes, is_loop ? 1 : 0, status, start_time, end_time, repeat_mode, youtube_channel_id,
+         overlay_logo_path, overlay_logo_position, overlay_logo_scale, overlay_logo_opacity,
+         scrolling_text, scrolling_text_speed, scrolling_text_position, scrolling_text_color, scrolling_text_bg_color, scrolling_text_bg_opacity, scrolling_text_size],
         function(err) {
           if (err) {
             console.error('Error creating rotation:', err.message);
@@ -241,48 +256,6 @@ class Rotation {
         }
         resolve({ success: true, deleted: this.changes > 0 });
       });
-    });
-  }
-
-  static getNextItem(rotationId, currentIndex) {
-    return new Promise((resolve, reject) => {
-      db.get(
-        `SELECT ri.*, v.filepath as video_filepath, v.thumbnail_path as video_thumbnail
-         FROM rotation_items ri
-         LEFT JOIN videos v ON ri.video_id = v.id
-         WHERE ri.rotation_id = ? AND ri.order_index > ?
-         ORDER BY ri.order_index ASC
-         LIMIT 1`,
-        [rotationId, currentIndex],
-        (err, row) => {
-          if (err) {
-            console.error('Error getting next rotation item:', err.message);
-            return reject(err);
-          }
-          resolve(row);
-        }
-      );
-    });
-  }
-
-  static getFirstItem(rotationId) {
-    return new Promise((resolve, reject) => {
-      db.get(
-        `SELECT ri.*, v.filepath as video_filepath, v.thumbnail_path as video_thumbnail
-         FROM rotation_items ri
-         LEFT JOIN videos v ON ri.video_id = v.id
-         WHERE ri.rotation_id = ?
-         ORDER BY ri.order_index ASC
-         LIMIT 1`,
-        [rotationId],
-        (err, row) => {
-          if (err) {
-            console.error('Error getting first rotation item:', err.message);
-            return reject(err);
-          }
-          resolve(row);
-        }
-      );
     });
   }
 

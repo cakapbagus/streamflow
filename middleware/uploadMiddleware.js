@@ -44,27 +44,31 @@ const thumbnailStorage = multer.diskStorage({
 
 const videoFilter = (req, file, cb) => {
   const allowedFormats = [
-    'video/mp4', 'video/avi', 'video/quicktime', 'video/x-matroska',
-    'video/webm', 'video/x-flv', 'video/x-ms-wmv', 'video/x-m4v',
-    'video/mpeg', 'video/mp2t', 'application/octet-stream' // sometimes mkv registers as octet-stream
+    'video/mp4', 'video/avi', 'video/x-msvideo',
+    'video/quicktime', 'video/webm'
   ];
-  const allowedExts = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v', '.ts', '.mpeg', '.mpg'];
+  const allowedExts = ['.mp4', '.avi', '.mov', '.webm'];
   const fileExt = path.extname(file.originalname).toLowerCase();
   if (allowedFormats.includes(file.mimetype) || allowedExts.includes(fileExt)) {
     cb(null, true);
   } else {
-    cb(new Error(`File format not allowed. Only ${allowedExts.join(', ')} are allowed.`), false);
+    cb(new Error('Only .mp4, .avi, .mov, and .webm formats are allowed'), false);
   }
 };
 
 const audioFilter = (req, file, cb) => {
-  const allowedFormats = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/aac', 'audio/mp4', 'audio/x-m4a', 'audio/ogg', 'audio/flac', 'audio/x-flac'];
+  const allowedFormats = [
+    'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav',
+    'audio/aac', 'audio/mp4', 'audio/x-m4a',
+    'audio/ogg', 'audio/flac', 'audio/x-flac',
+    'audio/x-ms-wma', 'audio/wma'
+  ];
   const fileExt = path.extname(file.originalname).toLowerCase();
-  const allowedExts = ['.mp3', '.wav', '.aac', '.m4a', '.ogg', '.flac'];
+  const allowedExts = ['.mp3', '.wav', '.aac', '.m4a', '.ogg', '.flac', '.wma'];
   if (allowedFormats.includes(file.mimetype) || allowedExts.includes(fileExt)) {
     cb(null, true);
   } else {
-    cb(new Error('Only .mp3, .wav, .aac, .m4a, .ogg, and .flac formats are allowed'), false);
+    cb(new Error('Only .m4a, .mp3, .wma, .aac, .wav, .flac, and .ogg formats are allowed'), false);
   }
 };
 

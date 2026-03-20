@@ -125,6 +125,11 @@
           <span class="text-xs mt-1">History</span>
           <span class="sidebar-tooltip group-hover:scale-100">Stream History</span>
         </a>
+        <a href="/normalization" class="sidebar-icon group <%= active === 'normalization' ? 'bg-primary' : '' %>">
+          <i class="ti ti-transform text-xl"></i>
+          <span class="text-xs mt-1">Normalize</span>
+          <span class="sidebar-tooltip group-hover:scale-100">Normalize Video</span>
+        </a>
         <% if (req.session && req.session.user_role==='admin' ) { %>
           <a href="/users" class="sidebar-icon group <%= active === 'users' ? 'bg-primary' : '' %>">
             <i class="ti ti-users text-xl"></i>

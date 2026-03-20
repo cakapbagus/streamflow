@@ -367,7 +367,16 @@ async function startRotationStream(rotation, item) {
       youtube_tags: item.tags,
       youtube_channel_id: selectedChannel.id,
       schedule_time: rotation.start_time,
-      end_time: rotation.end_time
+      end_time: rotation.end_time,
+      overlay_logo_path: rotation.overlay_logo_path || null,
+      overlay_logo_position: rotation.overlay_logo_position || 'bottom-right',
+      overlay_logo_scale: rotation.overlay_logo_scale || null,
+      overlay_logo_opacity: rotation.overlay_logo_opacity || null,
+      scrolling_text: rotation.scrolling_text || null,
+      scrolling_text_speed: rotation.scrolling_text_speed || null,
+      scrolling_text_position: rotation.scrolling_text_position || 'bottom',
+      scrolling_text_color: rotation.scrolling_text_color || null,
+      scrolling_text_size: rotation.scrolling_text_size || null
     });
 
     await streamingService.startStream(stream.id);

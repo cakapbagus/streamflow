@@ -10,7 +10,7 @@ class Stream {
       stream_key,
       platform,
       platform_icon,
-      bitrate = 3500,
+      bitrate = 3000,
       resolution,
       fps = 30,
       orientation = 'horizontal',
@@ -29,7 +29,18 @@ class Stream {
       youtube_tags = null,
       youtube_thumbnail = null,
       youtube_channel_id = null,
-      is_youtube_api = false
+      is_youtube_api = false,
+      overlay_logo_path = null,
+      overlay_logo_position = 'bottom-right',
+      overlay_logo_scale = null,
+      overlay_logo_opacity = null,
+      scrolling_text = null,
+      scrolling_text_speed = null,
+      scrolling_text_position = 'bottom',
+      scrolling_text_color = null,
+      scrolling_text_bg_color = null,
+      scrolling_text_bg_opacity = 80,
+      scrolling_text_size = null
     } = streamData;
     const loop_video_int = loop_video ? 1 : 0;
     const use_advanced_settings_int = use_advanced_settings ? 1 : 0;
@@ -42,13 +53,17 @@ class Stream {
           id, title, video_id, rtmp_url, stream_key, platform, platform_icon,
           bitrate, resolution, fps, orientation, loop_video,
           schedule_time, end_time, duration, status, status_updated_at, use_advanced_settings, user_id,
-          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api,
+          overlay_logo_path, overlay_logo_position, overlay_logo_scale, overlay_logo_opacity,
+          scrolling_text, scrolling_text_speed, scrolling_text_position, scrolling_text_color, scrolling_text_bg_color, scrolling_text_bg_opacity, scrolling_text_size
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, title, video_id, rtmp_url, stream_key, platform, platform_icon,
           bitrate, resolution, fps, orientation, loop_video_int,
           schedule_time, end_time, duration, final_status, status_updated_at, use_advanced_settings_int, user_id,
-          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api_int
+          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api_int,
+          overlay_logo_path, overlay_logo_position, overlay_logo_scale, overlay_logo_opacity,
+          scrolling_text, scrolling_text_speed, scrolling_text_position, scrolling_text_color, scrolling_text_bg_color, scrolling_text_bg_opacity, scrolling_text_size
         ],
         function (err) {
           if (err) {
@@ -348,42 +363,6 @@ class Stream {
     });
   }
   
-  static updateStartTime(id, startTime) {
-    return new Promise((resolve, reject) => {
-      db.run(
-        `UPDATE streams SET start_time = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [startTime, id],
-        function (err) {
-          if (err) {
-            console.error('Error updating start time:', err.message);
-            return reject(err);
-          }
-          resolve({ id, start_time: startTime, updated: this.changes > 0 });
-        }
-      );
-    });
-  }
-  
-  static clearScheduleFields(id) {
-    return new Promise((resolve, reject) => {
-      db.run(
-        `UPDATE streams SET 
-          schedule_time = NULL, 
-          end_time = NULL, 
-          start_time = NULL,
-          updated_at = CURRENT_TIMESTAMP 
-         WHERE id = ?`,
-        [id],
-        function (err) {
-          if (err) {
-            console.error('Error clearing schedule fields:', err.message);
-            return reject(err);
-          }
-          resolve({ id, updated: this.changes > 0 });
-        }
-      );
-    });
-  }
   static async getStreamWithVideo(id) {
     return new Promise((resolve, reject) => {
       db.get(

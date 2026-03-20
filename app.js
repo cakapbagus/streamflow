@@ -26,7 +26,7 @@ const { uploadVideo, upload, uploadThumbnail, uploadAudio } = require('./middlew
 const chunkUploadService = require('./services/chunkUploadService');
 const audioConverter = require('./services/audioConverter');
 const { ensureDirectories } = require('./utils/storage');
-const { getVideoInfo, generateThumbnail, generateImageThumbnail } = require('./utils/videoProcessor');
+const { getVideoInfo, generateThumbnail, generateImageThumbnail, ensureAudioTrack } = require('./utils/videoProcessor');
 const Video = require('./models/Video');
 const Playlist = require('./models/Playlist');
 const Stream = require('./models/Stream');
@@ -60,7 +60,7 @@ const logoStorage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    cb(null, `logo_${req.params.id}_${Date.now()}${ext}`);
+    cb(null, `logo_${uuidv4()}${ext}`);
   }
 });
 
@@ -403,6 +403,45 @@ app.get('/logout', (req, res) => {
   res.redirect('/login');
 });
 
+// Logo delete endpoint
+app.delete('/api/upload/logo', isAuthenticated, async (req, res) => {
+  try {
+    const paths = Array.isArray(req.body.paths) ? req.body.paths : (req.body.paths ? [req.body.paths] : []);
+    const logosDir = path.join(__dirname, 'public/uploads/logos');
+    for (const logoPath of paths) {
+      if (!logoPath || typeof logoPath !== 'string') continue;
+      // Security: only allow deleting files under uploads/logos/
+      const filename = path.basename(logoPath);
+      const fullPath = path.join(logosDir, filename);
+      if (!fullPath.startsWith(logosDir)) continue;
+      if (fs.existsSync(fullPath)) fs.unlink(fullPath, () => {});
+    }
+    res.json({ success: true });
+  } catch (e) {
+    res.json({ success: false });
+  }
+});
+
+// Logo upload endpoint (used by stream and rotation overlay feature)
+app.post('/api/upload/logo', isAuthenticated, uploadLogo.single('logo'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, error: 'No file uploaded or invalid file type (allowed: png, jpg, gif, webp, max 2MB)' });
+  }
+  const filePath = req.file.path;
+  // Validate logo dimensions: max 512x512
+  ffmpeg.ffprobe(filePath, (err, metadata) => {
+    if (!err && metadata && metadata.streams) {
+      const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+      if (videoStream && (videoStream.width > 512 || videoStream.height > 512)) {
+        fs.unlink(filePath, () => {});
+        return res.status(400).json({ success: false, error: `Logo dimensions (${videoStream.width}x${videoStream.height}) exceed maximum allowed size of 512x512 pixels.` });
+      }
+    }
+    const logoPath = `/uploads/logos/${req.file.filename}`;
+    res.json({ success: true, path: logoPath });
+  });
+});
+
 app.get('/signup', async (req, res) => {
   if (req.session.userId) {
     return res.redirect('/dashboard');
@@ -741,6 +780,17 @@ app.get('/gallery', isAuthenticated, async (req, res) => {
     res.redirect('/dashboard');
   }
 });
+app.get('/normalization', isAuthenticated, (req, res) => {
+  try {
+  res.render('normalization', {
+      title: 'Normalize Video',
+      active: 'normalization',
+    });
+  } catch (error) {
+    console.error('Normalization error:', error);
+    res.redirect('/dashboard');
+  }
+});
 app.get('/settings', isAuthenticated, async (req, res) => {
   try {
     const user = await User.findById(req.session.userId);
@@ -861,6 +911,39 @@ app.get('/history', isAuthenticated, async (req, res) => {
     });
   }
 });
+app.get('/api/history', isAuthenticated, async (req, res) => {
+  try {
+    const db = require('./db/database').db;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const sort = req.query.sort === 'oldest' ? 'ASC' : 'DESC';
+    const platform = req.query.platform || 'all';
+    const search = req.query.search || '';
+    const offset = (page - 1) * limit;
+
+    let whereClause = 'WHERE h.user_id = ?';
+    const params = [req.session.userId];
+    if (platform !== 'all') { whereClause += ' AND h.platform = ?'; params.push(platform); }
+    if (search) { whereClause += ' AND h.title LIKE ?'; params.push(`%${search}%`); }
+
+    const totalCount = await new Promise((resolve, reject) => {
+      db.get(`SELECT COUNT(*) as count FROM stream_history h ${whereClause}`, params, (err, row) => {
+        if (err) reject(err); else resolve(row.count);
+      });
+    });
+    const history = await new Promise((resolve, reject) => {
+      db.all(
+        `SELECT h.*, v.thumbnail_path FROM stream_history h LEFT JOIN videos v ON h.video_id = v.id ${whereClause} ORDER BY h.start_time ${sort} LIMIT ? OFFSET ?`,
+        [...params, limit, offset],
+        (err, rows) => { if (err) reject(err); else resolve(rows); }
+      );
+    });
+    res.json({ success: true, history, pagination: { page, limit, totalCount, totalPages: Math.ceil(totalCount / limit), sort: req.query.sort || 'newest', platform, search } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to load history' });
+  }
+});
+
 app.delete('/api/history/:id', isAuthenticated, async (req, res) => {
   try {
     const db = require('./db/database').db;
@@ -1493,6 +1576,7 @@ app.post('/upload/video', isAuthenticated, uploadVideo.single('video'), async (r
     }
     const { filename, originalname, path: videoPath, mimetype, size } = req.file;
     const thumbnailName = path.basename(filename, path.extname(filename)) + '.jpg';
+    await ensureAudioTrack(videoPath);
     const videoInfo = await getVideoInfo(videoPath);
     const thumbnailRelativePath = await generateThumbnail(videoPath, thumbnailName)
       .then(() => `/uploads/thumbnails/${thumbnailName}`)
@@ -1567,31 +1651,49 @@ app.post('/api/videos/upload', isAuthenticated, (req, res, next) => {
     const filePath = `/uploads/videos/${req.file.filename}`;
     const fullFilePath = path.join(__dirname, 'public', filePath);
     const fileSize = req.file.size;
-    await new Promise((resolve, reject) => {
-      ffmpeg.ffprobe(fullFilePath, (err, metadata) => {
+
+    // Delete temp file if client disconnects before response is sent
+    req.on('close', () => {
+      if (!res.headersSent) {
+        fs.unlink(fullFilePath, () => {});
+      }
+    });
+
+    await ensureAudioTrack(fullFilePath);
+
+    // Extract metadata via ffprobe
+    // -analyzeduration / -probesize extended so ffprobe can locate moov atom
+    // even when it sits at the end of large MP4 files
+    const metadata = await new Promise((resolve, reject) => {
+      ffmpeg.ffprobe(fullFilePath, ['-analyzeduration', '100M', '-probesize', '100M'], (err, meta) => {
         if (err) {
           console.error('Error extracting metadata:', err);
           return reject(err);
         }
-        const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
-        const duration = metadata.format.duration || 0;
-        const format = metadata.format.format_name || '';
-        const resolution = videoStream ? `${videoStream.width}x${videoStream.height}` : '';
-        const bitrate = metadata.format.bit_rate ?
-          Math.round(parseInt(metadata.format.bit_rate) / 1000) :
-          null;
-        let fps = null;
-        if (videoStream && videoStream.avg_frame_rate) {
-          const fpsRatio = videoStream.avg_frame_rate.split('/');
-          if (fpsRatio.length === 2 && parseInt(fpsRatio[1]) !== 0) {
-            fps = Math.round((parseInt(fpsRatio[0]) / parseInt(fpsRatio[1]) * 100)) / 100;
-          } else {
-            fps = parseInt(fpsRatio[0]) || null;
-          }
-        }
-        const thumbnailFilename = `thumb-${path.parse(req.file.filename).name}.jpg`;
-        const thumbnailPath = `/uploads/thumbnails/${thumbnailFilename}`;
-        const fullThumbnailPath = path.join(__dirname, 'public', thumbnailPath);
+        resolve(meta);
+      });
+    });
+
+    const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+    const duration = metadata.format.duration || 0;
+    const format = metadata.format.format_name || '';
+    const resolution = videoStream ? `${videoStream.width}x${videoStream.height}` : '';
+    const bitrate = metadata.format.bit_rate ? Math.round(parseInt(metadata.format.bit_rate) / 1000) : null;
+    let fps = null;
+    if (videoStream && videoStream.avg_frame_rate) {
+      const fpsRatio = videoStream.avg_frame_rate.split('/');
+      if (fpsRatio.length === 2 && parseInt(fpsRatio[1]) !== 0) {
+        fps = Math.round((parseInt(fpsRatio[0]) / parseInt(fpsRatio[1]) * 100)) / 100;
+      } else {
+        fps = parseInt(fpsRatio[0]) || null;
+      }
+    }
+
+    // Thumbnail creation — non-fatal: if it fails, fall back to default thumbnail
+    const thumbnailFilename = `thumb-${path.parse(req.file.filename).name}.jpg`;
+    let thumbnailPath = '/images/default-thumbnail.jpg';
+    try {
+      await new Promise((resolve, reject) => {
         ffmpeg(fullFilePath)
           .screenshots({
             timestamps: ['10%'],
@@ -1599,38 +1701,31 @@ app.post('/api/videos/upload', isAuthenticated, (req, res, next) => {
             folder: path.join(__dirname, 'public', 'uploads', 'thumbnails'),
             size: '854x480'
           })
-          .on('end', async () => {
-            try {
-              const videoData = {
-                title,
-                filepath: filePath,
-                thumbnail_path: thumbnailPath,
-                file_size: fileSize,
-                duration,
-                format,
-                resolution,
-                bitrate,
-                fps,
-                user_id: req.session.userId
-              };
-              const video = await Video.create(videoData);
-              res.json({
-                success: true,
-                message: 'Video uploaded successfully',
-                video
-              });
-              resolve();
-            } catch (dbError) {
-              console.error('Database error:', dbError);
-              reject(dbError);
-            }
-          })
-          .on('error', (err) => {
-            console.error('Error creating thumbnail:', err);
-            reject(err);
-          });
+          .on('end', resolve)
+          .on('error', reject);
       });
-    });
+      thumbnailPath = `/uploads/thumbnails/${thumbnailFilename}`;
+    } catch (thumbErr) {
+      console.error('Thumbnail creation failed (non-fatal), using default:', thumbErr.message);
+    }
+
+    const rawFolderId = req.body.folder_id;
+    const folderId = (rawFolderId !== undefined && rawFolderId !== '' && rawFolderId !== 'null') ? Number(rawFolderId) : null;
+    const videoData = {
+      title,
+      filepath: filePath,
+      thumbnail_path: thumbnailPath,
+      file_size: fileSize,
+      duration,
+      format,
+      resolution,
+      bitrate,
+      fps,
+      folder_id: folderId,
+      user_id: req.session.userId
+    };
+    const video = await Video.create(videoData);
+    res.json({ success: true, message: 'Video uploaded successfully', video });
   } catch (error) {
     console.error('Upload error details:', error);
     res.status(500).json({
@@ -1690,6 +1785,8 @@ app.post('/api/audio/upload', isAuthenticated, (req, res, next) => {
     const audioInfo = await audioConverter.getAudioInfo(fullFilePath);
     const stats = fs.statSync(fullFilePath);
     const thumbnailPath = '/images/audio-thumbnail.png';
+    const rawFolderIdAudio = req.body.folder_id;
+    const folderIdAudio = (rawFolderIdAudio !== undefined && rawFolderIdAudio !== '' && rawFolderIdAudio !== 'null') ? Number(rawFolderIdAudio) : null;
     const videoData = {
       title,
       filepath: filePath,
@@ -1700,6 +1797,7 @@ app.post('/api/audio/upload', isAuthenticated, (req, res, next) => {
       resolution: null,
       bitrate: audioInfo.bitrate,
       fps: null,
+      folder_id: folderIdAudio,
       user_id: req.session.userId
     };
     const video = await Video.create(videoData);
@@ -1724,10 +1822,10 @@ app.post('/api/videos/chunk/init', isAuthenticated, async (req, res) => {
     if (!filename || !fileSize || !totalChunks) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
-    const allowedExts = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v', '.ts', '.mpeg', '.mpg'];
+    const allowedExts = ['.mp4', '.avi', '.mov', '.webm'];
     const ext = path.extname(filename).toLowerCase();
     if (!allowedExts.includes(ext)) {
-      return res.status(400).json({ success: false, error: `File format not allowed. Only ${allowedExts.join(', ')} are allowed.` });
+      return res.status(400).json({ success: false, error: `Format is not supported. Only ${allowedExts.join(', ')} are allowed.` });
     }
 
     const info = await chunkUploadService.initUpload(filename, fileSize, totalChunks, req.session.userId);
@@ -1791,8 +1889,10 @@ app.get('/api/videos/chunk/status/:uploadId', isAuthenticated, async (req, res) 
 });
 
 app.post('/api/videos/chunk/complete', isAuthenticated, async (req, res) => {
+  let mergedFilePath = null;
   try {
-    const { uploadId } = req.body;
+    const { uploadId, folder_id: rawChunkFolderId } = req.body;
+    const chunkFolderId = (rawChunkFolderId !== undefined && rawChunkFolderId !== null && rawChunkFolderId !== '') ? Number(rawChunkFolderId) : null;
     if (!uploadId) {
       return res.status(400).json({ success: false, error: 'Missing upload ID' });
     }
@@ -1806,28 +1906,43 @@ app.post('/api/videos/chunk/complete', isAuthenticated, async (req, res) => {
     const result = await chunkUploadService.mergeChunks(uploadId);
     const title = path.parse(info.filename).name;
     const fullFilePath = result.fullPath;
-    const videoData = await new Promise((resolve, reject) => {
-      ffmpeg.ffprobe(fullFilePath, (err, metadata) => {
+    mergedFilePath = fullFilePath; // track for cleanup on error
+
+    await ensureAudioTrack(fullFilePath);
+
+    // Extract metadata via ffprobe
+    // -analyzeduration / -probesize extended so ffprobe can locate moov atom
+    // even when it sits at the end of large MP4 files
+    const metadata = await new Promise((resolve, reject) => {
+      ffmpeg.ffprobe(fullFilePath, ['-analyzeduration', '100M', '-probesize', '100M'], (err, meta) => {
         if (err) {
           console.error('Error extracting metadata:', err);
           return reject(err);
         }
-        const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
-        const duration = metadata.format.duration || 0;
-        const format = metadata.format.format_name || '';
-        const resolution = videoStream ? `${videoStream.width}x${videoStream.height}` : '';
-        const bitrate = metadata.format.bit_rate ? Math.round(parseInt(metadata.format.bit_rate) / 1000) : null;
-        let fps = null;
-        if (videoStream && videoStream.avg_frame_rate) {
-          const fpsRatio = videoStream.avg_frame_rate.split('/');
-          if (fpsRatio.length === 2 && parseInt(fpsRatio[1]) !== 0) {
-            fps = Math.round((parseInt(fpsRatio[0]) / parseInt(fpsRatio[1]) * 100)) / 100;
-          } else {
-            fps = parseInt(fpsRatio[0]) || null;
-          }
-        }
-        const thumbnailFilename = `thumb-${path.parse(result.filename).name}.jpg`;
-        const thumbnailPath = `/uploads/thumbnails/${thumbnailFilename}`;
+        resolve(meta);
+      });
+    });
+
+    const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+    const duration = metadata.format.duration || 0;
+    const format = metadata.format.format_name || '';
+    const resolution = videoStream ? `${videoStream.width}x${videoStream.height}` : '';
+    const bitrate = metadata.format.bit_rate ? Math.round(parseInt(metadata.format.bit_rate) / 1000) : null;
+    let fps = null;
+    if (videoStream && videoStream.avg_frame_rate) {
+      const fpsRatio = videoStream.avg_frame_rate.split('/');
+      if (fpsRatio.length === 2 && parseInt(fpsRatio[1]) !== 0) {
+        fps = Math.round((parseInt(fpsRatio[0]) / parseInt(fpsRatio[1]) * 100)) / 100;
+      } else {
+        fps = parseInt(fpsRatio[0]) || null;
+      }
+    }
+
+    // Thumbnail creation — non-fatal: if it fails, fall back to default thumbnail
+    const thumbnailFilename = `thumb-${path.parse(result.filename).name}.jpg`;
+    let thumbnailPath = '/images/default-thumbnail.jpg';
+    try {
+      await new Promise((resolve, reject) => {
         ffmpeg(fullFilePath)
           .screenshots({
             timestamps: ['10%'],
@@ -1835,36 +1950,48 @@ app.post('/api/videos/chunk/complete', isAuthenticated, async (req, res) => {
             folder: path.join(__dirname, 'public', 'uploads', 'thumbnails'),
             size: '854x480'
           })
-          .on('end', async () => {
-            resolve({
-              title,
-              filepath: result.filepath,
-              thumbnail_path: thumbnailPath,
-              file_size: result.fileSize,
-              duration,
-              format,
-              resolution,
-              bitrate,
-              fps,
-              user_id: req.session.userId
-            });
-          })
-          .on('error', (err) => {
-            console.error('Error creating thumbnail:', err);
-            reject(err);
-          });
+          .on('end', resolve)
+          .on('error', reject);
       });
-    });
+      thumbnailPath = `/uploads/thumbnails/${thumbnailFilename}`;
+    } catch (thumbErr) {
+      console.error('Thumbnail creation failed (non-fatal), using default:', thumbErr.message);
+    }
+
+    const videoData = {
+      title,
+      filepath: result.filepath,
+      thumbnail_path: thumbnailPath,
+      file_size: result.fileSize,
+      duration,
+      format,
+      resolution,
+      bitrate,
+      fps,
+      folder_id: chunkFolderId,
+      user_id: req.session.userId
+    };
     const video = await Video.create(videoData);
     await chunkUploadService.cleanupUpload(uploadId);
     res.json({ success: true, message: 'Video uploaded successfully', video });
   } catch (error) {
     console.error('Chunk complete error:', error);
+
+    // Delete merged file if it was already written but processing failed (corrupt video, ffprobe error, etc.)
+    if (mergedFilePath) {
+      fs.unlink(mergedFilePath, (unlinkErr) => {
+        if (unlinkErr && unlinkErr.code !== 'ENOENT') {
+          console.error('Failed to delete corrupt merged file:', unlinkErr.message);
+        }
+      });
+    }
+
+    // Also clean up chunk temp files and upload session
+    if (req.body && req.body.uploadId) {
+      chunkUploadService.cleanupUpload(req.body.uploadId).catch(e => console.error('Chunk cleanup error:', e));
+    }
+
     if (error.code === 'ENOSPC' || (error.message && error.message.includes('ENOSPC'))) {
-      // Clean up chunks to reclaim disk space after ENOSPC during merge
-      if (req.body && req.body.uploadId) {
-        chunkUploadService.cleanupUpload(req.body.uploadId).catch(e => console.error('Cleanup after ENOSPC error:', e));
-      }
       return res.status(507).json({ success: false, error: 'Server storage is full. Upload failed.' });
     }
     res.status(500).json({ success: false, error: 'Failed to complete upload', details: error.message });
@@ -2426,7 +2553,8 @@ app.post('/api/videos/import-drive', isAuthenticated, [
     try {
       const fileId = extractFileId(driveUrl);
       const jobId = uuidv4();
-      processGoogleDriveImport(jobId, fileId, req.session.userId)
+      const driveFolderId = req.body.folder_id != null && req.body.folder_id !== '' ? Number(req.body.folder_id) : null;
+      processGoogleDriveImport(jobId, fileId, req.session.userId, driveFolderId)
         .catch(err => console.error('Drive import failed:', err));
       return res.json({
         success: true,
@@ -2456,34 +2584,48 @@ app.get('/api/videos/import-status/:jobId', isAuthenticated, async (req, res) =>
   });
 });
 const importJobs = {};
-async function processGoogleDriveImport(jobId, fileId, userId) {
+
+app.delete('/api/videos/import/:jobId', isAuthenticated, (req, res) => {
+  const { jobId } = req.params;
+  if (importJobs[jobId] && importJobs[jobId].userId === req.session.userId) {
+    importJobs[jobId].cancelled = true;
+    importJobs[jobId].status = 'cancelled';
+  }
+  res.json({ success: true });
+});
+
+async function processGoogleDriveImport(jobId, fileId, userId, folderId = null) {
   const { downloadFile } = require('./utils/googleDriveService');
-  const { getVideoInfo, generateThumbnail } = require('./utils/videoProcessor');
+  const { getVideoInfo, generateThumbnail, ensureAudioTrack: ensureAudio } = require('./utils/videoProcessor');
   const ffmpeg = require('fluent-ffmpeg');
 
   importJobs[jobId] = {
     status: 'downloading',
     progress: 0,
-    message: 'Starting download...'
+    message: 'Starting download...',
+    userId,
+    cancelled: false
   };
 
   try {
     let result;
     try {
       result = await downloadFile(fileId, (progress) => {
-        importJobs[jobId] = {
-          status: 'downloading',
-          progress: progress.progress,
-          message: `Downloading ${progress.filename}: ${progress.progress}%`
-        };
+        if (importJobs[jobId] && !importJobs[jobId].cancelled) {
+          importJobs[jobId].status = 'downloading';
+          importJobs[jobId].progress = progress.progress;
+          importJobs[jobId].message = `Downloading ${progress.filename}: ${progress.progress}%`;
+        }
       });
     } catch (downloadError) {
-      importJobs[jobId] = {
-        status: 'failed',
-        progress: 0,
-        message: downloadError.message || 'Failed to download file'
-      };
+      importJobs[jobId] = { status: 'failed', progress: 0, message: downloadError.message || 'Failed to download file' };
       setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+      return;
+    }
+
+    if (importJobs[jobId] && importJobs[jobId].cancelled) {
+      if (result && result.localFilePath) fs.unlink(result.localFilePath, () => {});
+      setTimeout(() => { delete importJobs[jobId]; }, 60 * 1000);
       return;
     }
 
@@ -2497,11 +2639,22 @@ async function processGoogleDriveImport(jobId, fileId, userId) {
       return;
     }
 
-    importJobs[jobId] = {
-      status: 'processing',
-      progress: 100,
-      message: 'Processing video...'
-    };
+    const _allowedImportExts = ['.mp4', '.avi', '.mov', '.webm'];
+    const _importedExt = path.extname(result.filename || result.localFilePath).toLowerCase();
+    if (!_allowedImportExts.includes(_importedExt)) {
+      fs.unlink(result.localFilePath, () => {});
+      importJobs[jobId] = {
+        status: 'skipped',
+        progress: 0,
+        message: `Format "${_importedExt || 'unknown'}" is not supported. Only MP4, AVI, MOV, and WebM files can be imported.`
+      };
+      setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+      return;
+    }
+
+    Object.assign(importJobs[jobId], { status: 'processing', progress: 100, message: 'Processing video...' });
+
+    await ensureAudio(result.localFilePath);
 
     let videoInfo;
     try {
@@ -2512,6 +2665,7 @@ async function processGoogleDriveImport(jobId, fileId, userId) {
 
     let resolution = '';
     let bitrate = null;
+    let fps = null;
 
     try {
       const metadata = await new Promise((resolve, reject) => {
@@ -2526,6 +2680,14 @@ async function processGoogleDriveImport(jobId, fileId, userId) {
       const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
       if (videoStream) {
         resolution = `${videoStream.width}x${videoStream.height}`;
+        if (videoStream.avg_frame_rate) {
+          const fpsRatio = videoStream.avg_frame_rate.split('/');
+          if (fpsRatio.length === 2 && parseInt(fpsRatio[1]) !== 0) {
+            fps = Math.round((parseInt(fpsRatio[0]) / parseInt(fpsRatio[1]) * 100)) / 100;
+          } else {
+            fps = parseInt(fpsRatio[0]) || null;
+          }
+        }
       }
 
       if (metadata.format && metadata.format.bit_rate) {
@@ -2558,6 +2720,8 @@ async function processGoogleDriveImport(jobId, fileId, userId) {
       format: format,
       resolution: resolution,
       bitrate: bitrate,
+      fps,
+      folder_id: folderId,
       user_id: userId
     };
 
@@ -2598,7 +2762,8 @@ app.post('/api/videos/import-mediafire', isAuthenticated, [
     try {
       const fileKey = extractFileKey(mediafireUrl);
       const jobId = uuidv4();
-      processMediafireImport(jobId, fileKey, req.session.userId)
+      const mediafireFolderId = req.body.folder_id != null && req.body.folder_id !== '' ? Number(req.body.folder_id) : null;
+      processMediafireImport(jobId, fileKey, req.session.userId, mediafireFolderId)
         .catch(err => console.error('Mediafire import failed:', err));
       return res.json({
         success: true,
@@ -2618,32 +2783,50 @@ app.post('/api/videos/import-mediafire', isAuthenticated, [
   }
 });
 
-async function processMediafireImport(jobId, fileKey, userId) {
+async function processMediafireImport(jobId, fileKey, userId, folderId = null) {
   const { downloadFile } = require('./utils/mediafireService');
-  const { getVideoInfo, generateThumbnail } = require('./utils/videoProcessor');
+  const { getVideoInfo, generateThumbnail, ensureAudioTrack: ensureAudio } = require('./utils/videoProcessor');
   const ffmpeg = require('fluent-ffmpeg');
 
   importJobs[jobId] = {
     status: 'downloading',
     progress: 0,
-    message: 'Starting download...'
+    message: 'Starting download...',
+    userId,
+    cancelled: false
   };
 
   try {
     const result = await downloadFile(fileKey, (progress) => {
-      importJobs[jobId] = {
-        status: 'downloading',
-        progress: progress.progress,
-        message: `Downloading ${progress.filename}: ${progress.progress}%`
-      };
+      if (importJobs[jobId] && !importJobs[jobId].cancelled) {
+        importJobs[jobId].status = 'downloading';
+        importJobs[jobId].progress = progress.progress;
+        importJobs[jobId].message = `Downloading ${progress.filename}: ${progress.progress}%`;
+      }
     });
 
-    importJobs[jobId] = {
-      status: 'processing',
-      progress: 100,
-      message: 'Processing video...'
-    };
+    if (importJobs[jobId] && importJobs[jobId].cancelled) {
+      if (result && result.localFilePath) fs.unlink(result.localFilePath, () => {});
+      setTimeout(() => { delete importJobs[jobId]; }, 60 * 1000);
+      return;
+    }
 
+    const _allowedImportExts = ['.mp4', '.avi', '.mov', '.webm'];
+    const _importedExt = path.extname(result.filename || result.localFilePath).toLowerCase();
+    if (!_allowedImportExts.includes(_importedExt)) {
+      fs.unlink(result.localFilePath, () => {});
+      importJobs[jobId] = {
+        status: 'skipped',
+        progress: 0,
+        message: `Format "${_importedExt || 'unknown'}" is not supported. Only MP4, AVI, MOV, and WebM files can be imported.`
+      };
+      setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+      return;
+    }
+
+    Object.assign(importJobs[jobId], { status: 'processing', progress: 100, message: 'Processing video...' });
+
+    await ensureAudio(result.localFilePath);
     const videoInfo = await getVideoInfo(result.localFilePath);
 
     const metadata = await new Promise((resolve, reject) => {
@@ -2655,10 +2838,19 @@ async function processMediafireImport(jobId, fileKey, userId) {
 
     let resolution = '';
     let bitrate = null;
+    let fps = null;
 
     const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
     if (videoStream) {
       resolution = `${videoStream.width}x${videoStream.height}`;
+      if (videoStream.avg_frame_rate) {
+        const fpsRatio = videoStream.avg_frame_rate.split('/');
+        if (fpsRatio.length === 2 && parseInt(fpsRatio[1]) !== 0) {
+          fps = Math.round((parseInt(fpsRatio[0]) / parseInt(fpsRatio[1]) * 100)) / 100;
+        } else {
+          fps = parseInt(fpsRatio[0]) || null;
+        }
+      }
     }
 
     if (metadata.format && metadata.format.bit_rate) {
@@ -2683,6 +2875,8 @@ async function processMediafireImport(jobId, fileKey, userId) {
       format: format,
       resolution: resolution,
       bitrate: bitrate,
+      fps,
+      folder_id: folderId,
       user_id: userId
     };
 
@@ -2726,7 +2920,8 @@ app.post('/api/videos/import-dropbox', isAuthenticated, [
       });
     }
     const jobId = uuidv4();
-    processDropboxImport(jobId, dropboxUrl, req.session.userId)
+    const dropboxFolderId = req.body.folder_id != null && req.body.folder_id !== '' ? Number(req.body.folder_id) : null;
+    processDropboxImport(jobId, dropboxUrl, req.session.userId, dropboxFolderId)
       .catch(err => console.error('Dropbox import failed:', err));
     return res.json({
       success: true,
@@ -2739,32 +2934,50 @@ app.post('/api/videos/import-dropbox', isAuthenticated, [
   }
 });
 
-async function processDropboxImport(jobId, dropboxUrl, userId) {
+async function processDropboxImport(jobId, dropboxUrl, userId, folderId = null) {
   const { downloadFile } = require('./utils/dropboxService');
-  const { getVideoInfo, generateThumbnail } = require('./utils/videoProcessor');
+  const { getVideoInfo, generateThumbnail, ensureAudioTrack: ensureAudio } = require('./utils/videoProcessor');
   const ffmpeg = require('fluent-ffmpeg');
 
   importJobs[jobId] = {
     status: 'downloading',
     progress: 0,
-    message: 'Starting download...'
+    message: 'Starting download...',
+    userId,
+    cancelled: false
   };
 
   try {
     const result = await downloadFile(dropboxUrl, (progress) => {
-      importJobs[jobId] = {
-        status: 'downloading',
-        progress: progress.progress,
-        message: `Downloading ${progress.filename}: ${progress.progress}%`
-      };
+      if (importJobs[jobId] && !importJobs[jobId].cancelled) {
+        importJobs[jobId].status = 'downloading';
+        importJobs[jobId].progress = progress.progress;
+        importJobs[jobId].message = `Downloading ${progress.filename}: ${progress.progress}%`;
+      }
     });
 
-    importJobs[jobId] = {
-      status: 'processing',
-      progress: 100,
-      message: 'Processing video...'
-    };
+    if (importJobs[jobId] && importJobs[jobId].cancelled) {
+      if (result && result.localFilePath) fs.unlink(result.localFilePath, () => {});
+      setTimeout(() => { delete importJobs[jobId]; }, 60 * 1000);
+      return;
+    }
 
+    const _allowedImportExts = ['.mp4', '.avi', '.mov', '.webm'];
+    const _importedExt = path.extname(result.filename || result.localFilePath).toLowerCase();
+    if (!_allowedImportExts.includes(_importedExt)) {
+      fs.unlink(result.localFilePath, () => {});
+      importJobs[jobId] = {
+        status: 'skipped',
+        progress: 0,
+        message: `Format "${_importedExt || 'unknown'}" is not supported. Only MP4, AVI, MOV, and WebM files can be imported.`
+      };
+      setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+      return;
+    }
+
+    Object.assign(importJobs[jobId], { status: 'processing', progress: 100, message: 'Processing video...' });
+
+    await ensureAudio(result.localFilePath);
     const videoInfo = await getVideoInfo(result.localFilePath);
 
     const metadata = await new Promise((resolve, reject) => {
@@ -2776,10 +2989,19 @@ async function processDropboxImport(jobId, dropboxUrl, userId) {
 
     let resolution = '';
     let bitrate = null;
+    let fps = null;
 
     const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
     if (videoStream) {
       resolution = `${videoStream.width}x${videoStream.height}`;
+      if (videoStream.avg_frame_rate) {
+        const fpsRatio = videoStream.avg_frame_rate.split('/');
+        if (fpsRatio.length === 2 && parseInt(fpsRatio[1]) !== 0) {
+          fps = Math.round((parseInt(fpsRatio[0]) / parseInt(fpsRatio[1]) * 100)) / 100;
+        } else {
+          fps = parseInt(fpsRatio[0]) || null;
+        }
+      }
     }
 
     if (metadata.format && metadata.format.bit_rate) {
@@ -2804,6 +3026,8 @@ async function processDropboxImport(jobId, dropboxUrl, userId) {
       format: format,
       resolution: resolution,
       bitrate: bitrate,
+      fps,
+      folder_id: folderId,
       user_id: userId
     };
 
@@ -2847,7 +3071,8 @@ app.post('/api/videos/import-mega', isAuthenticated, [
       });
     }
     const jobId = uuidv4();
-    processMegaImport(jobId, megaUrl, req.session.userId)
+    const megaFolderId = req.body.folder_id != null && req.body.folder_id !== '' ? Number(req.body.folder_id) : null;
+    processMegaImport(jobId, megaUrl, req.session.userId, megaFolderId)
       .catch(err => console.error('MEGA import failed:', err));
     return res.json({
       success: true,
@@ -2860,32 +3085,50 @@ app.post('/api/videos/import-mega', isAuthenticated, [
   }
 });
 
-async function processMegaImport(jobId, megaUrl, userId) {
+async function processMegaImport(jobId, megaUrl, userId, folderId = null) {
   const { downloadFile } = require('./utils/megaService');
-  const { getVideoInfo, generateThumbnail } = require('./utils/videoProcessor');
+  const { getVideoInfo, generateThumbnail, ensureAudioTrack: ensureAudio } = require('./utils/videoProcessor');
   const ffmpeg = require('fluent-ffmpeg');
 
   importJobs[jobId] = {
     status: 'downloading',
     progress: 0,
-    message: 'Starting download...'
+    message: 'Starting download...',
+    userId,
+    cancelled: false
   };
 
   try {
     const result = await downloadFile(megaUrl, (progress) => {
-      importJobs[jobId] = {
-        status: 'downloading',
-        progress: progress.progress,
-        message: `Downloading ${progress.filename}: ${progress.progress}%`
-      };
+      if (importJobs[jobId] && !importJobs[jobId].cancelled) {
+        importJobs[jobId].status = 'downloading';
+        importJobs[jobId].progress = progress.progress;
+        importJobs[jobId].message = `Downloading ${progress.filename}: ${progress.progress}%`;
+      }
     });
 
-    importJobs[jobId] = {
-      status: 'processing',
-      progress: 100,
-      message: 'Processing video...'
-    };
+    if (importJobs[jobId] && importJobs[jobId].cancelled) {
+      if (result && result.localFilePath) fs.unlink(result.localFilePath, () => {});
+      setTimeout(() => { delete importJobs[jobId]; }, 60 * 1000);
+      return;
+    }
 
+    const _allowedImportExts = ['.mp4', '.avi', '.mov', '.webm'];
+    const _importedExt = path.extname(result.filename || result.localFilePath).toLowerCase();
+    if (!_allowedImportExts.includes(_importedExt)) {
+      fs.unlink(result.localFilePath, () => {});
+      importJobs[jobId] = {
+        status: 'skipped',
+        progress: 0,
+        message: `Format "${_importedExt || 'unknown'}" is not supported. Only MP4, AVI, MOV, and WebM files can be imported.`
+      };
+      setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+      return;
+    }
+
+    Object.assign(importJobs[jobId], { status: 'processing', progress: 100, message: 'Processing video...' });
+
+    await ensureAudio(result.localFilePath);
     const videoInfo = await getVideoInfo(result.localFilePath);
 
     const metadata = await new Promise((resolve, reject) => {
@@ -2897,10 +3140,19 @@ async function processMegaImport(jobId, megaUrl, userId) {
 
     let resolution = '';
     let bitrate = null;
+    let fps = null;
 
     const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
     if (videoStream) {
       resolution = `${videoStream.width}x${videoStream.height}`;
+      if (videoStream.avg_frame_rate) {
+        const fpsRatio = videoStream.avg_frame_rate.split('/');
+        if (fpsRatio.length === 2 && parseInt(fpsRatio[1]) !== 0) {
+          fps = Math.round((parseInt(fpsRatio[0]) / parseInt(fpsRatio[1]) * 100)) / 100;
+        } else {
+          fps = parseInt(fpsRatio[0]) || null;
+        }
+      }
     }
 
     if (metadata.format && metadata.format.bit_rate) {
@@ -2925,6 +3177,8 @@ async function processMegaImport(jobId, megaUrl, userId) {
       format: format,
       resolution: resolution,
       bitrate: bitrate,
+      fps,
+      folder_id: folderId,
       user_id: userId
     };
 
@@ -3100,13 +3354,24 @@ app.post('/api/streams', isAuthenticated, [
       stream_key: req.body.streamKey,
       platform,
       platform_icon,
-      bitrate: parseInt(req.body.bitrate) || 3500,
+      bitrate: parseInt(req.body.bitrate) || 3000,
       resolution: req.body.resolution || '1280x720',
       fps: parseInt(req.body.fps) || 30,
       orientation: req.body.orientation || 'horizontal',
       loop_video: req.body.loopVideo === 'true' || req.body.loopVideo === true,
       use_advanced_settings: req.body.useAdvancedSettings === 'true' || req.body.useAdvancedSettings === true,
-      user_id: req.session.userId
+      user_id: req.session.userId,
+      overlay_logo_path: req.body.overlay_logo_path || null,
+      overlay_logo_position: req.body.overlay_logo_position || 'bottom-right',
+      overlay_logo_scale: req.body.overlay_logo_scale ? parseFloat(req.body.overlay_logo_scale) : null,
+      overlay_logo_opacity: req.body.overlay_logo_opacity ? parseFloat(req.body.overlay_logo_opacity) : null,
+      scrolling_text: req.body.scrolling_text || null,
+      scrolling_text_speed: req.body.scrolling_text_speed ? parseInt(req.body.scrolling_text_speed) : null,
+      scrolling_text_position: req.body.scrolling_text_position || 'bottom',
+      scrolling_text_color: req.body.scrolling_text_color || null,
+      scrolling_text_bg_color: req.body.scrolling_text_bg_color || null,
+      scrolling_text_bg_opacity: req.body.scrolling_text_bg_opacity != null ? parseInt(req.body.scrolling_text_bg_opacity) : 80,
+      scrolling_text_size: req.body.scrolling_text_size ? parseInt(req.body.scrolling_text_size) : null
     };
     const serverTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -3166,7 +3431,11 @@ app.post('/api/streams/youtube', isAuthenticated, uploadThumbnail.single('thumbn
       });
     }
 
-    const { videoId, title, description, privacy, category, tags, loopVideo, scheduleStartTime, scheduleEndTime, repeat, ytChannelId } = req.body;
+    const { videoId, title, description, privacy, category, tags, loopVideo, scheduleStartTime, scheduleEndTime, repeat, ytChannelId,
+      overlay_logo_path, overlay_logo_position, overlay_logo_scale, overlay_logo_opacity,
+      scrolling_text, scrolling_text_speed, scrolling_text_position, scrolling_text_color,
+      scrolling_text_bg_color, scrolling_text_bg_opacity, scrolling_text_size
+    } = req.body;
 
     let selectedChannel;
     if (ytChannelId) {
@@ -3231,7 +3500,18 @@ app.post('/api/streams/youtube', isAuthenticated, uploadThumbnail.single('thumbn
       youtube_tags: tags || '',
       youtube_thumbnail: localThumbnailPath,
       youtube_channel_id: selectedChannel.id,
-      is_youtube_api: true
+      is_youtube_api: true,
+      overlay_logo_path: overlay_logo_path || null,
+      overlay_logo_position: overlay_logo_position || 'bottom-right',
+      overlay_logo_scale: overlay_logo_scale ? parseFloat(overlay_logo_scale) : null,
+      overlay_logo_opacity: overlay_logo_opacity ? parseFloat(overlay_logo_opacity) : null,
+      scrolling_text: scrolling_text || null,
+      scrolling_text_speed: scrolling_text_speed ? parseInt(scrolling_text_speed) : null,
+      scrolling_text_position: scrolling_text_position || 'bottom',
+      scrolling_text_color: scrolling_text_color || null,
+      scrolling_text_bg_color: scrolling_text_bg_color || null,
+      scrolling_text_bg_opacity: scrolling_text_bg_opacity != null ? parseInt(scrolling_text_bg_opacity) : 80,
+      scrolling_text_size: scrolling_text_size ? parseInt(scrolling_text_size) : null
     };
 
     if (scheduleStartTime) {
@@ -3514,6 +3794,19 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
         }
       }
 
+      // Overlay logo & scrolling text fields (YouTube API stream)
+      if ('overlay_logo_path' in req.body) updateData.overlay_logo_path = req.body.overlay_logo_path || null;
+      if ('overlay_logo_position' in req.body) updateData.overlay_logo_position = req.body.overlay_logo_position || 'bottom-right';
+      if ('overlay_logo_scale' in req.body) updateData.overlay_logo_scale = req.body.overlay_logo_scale ? parseFloat(req.body.overlay_logo_scale) : null;
+      if ('overlay_logo_opacity' in req.body) updateData.overlay_logo_opacity = req.body.overlay_logo_opacity ? parseFloat(req.body.overlay_logo_opacity) : null;
+      if ('scrolling_text' in req.body) updateData.scrolling_text = req.body.scrolling_text || null;
+      if ('scrolling_text_speed' in req.body) updateData.scrolling_text_speed = req.body.scrolling_text_speed ? parseInt(req.body.scrolling_text_speed) : null;
+      if ('scrolling_text_position' in req.body) updateData.scrolling_text_position = req.body.scrolling_text_position || 'bottom';
+      if ('scrolling_text_color' in req.body) updateData.scrolling_text_color = req.body.scrolling_text_color || null;
+      if ('scrolling_text_bg_color' in req.body) updateData.scrolling_text_bg_color = req.body.scrolling_text_bg_color || null;
+      if ('scrolling_text_bg_opacity' in req.body) updateData.scrolling_text_bg_opacity = req.body.scrolling_text_bg_opacity != null ? parseInt(req.body.scrolling_text_bg_opacity) : 80;
+      if ('scrolling_text_size' in req.body) updateData.scrolling_text_size = req.body.scrolling_text_size ? parseInt(req.body.scrolling_text_size) : null;
+
       await Stream.update(req.params.id, updateData);
       return res.json({ success: true, message: 'Stream updated successfully' });
     }
@@ -3563,6 +3856,18 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
     if (req.body.useAdvancedSettings !== undefined) {
       updateData.use_advanced_settings = req.body.useAdvancedSettings === 'true' || req.body.useAdvancedSettings === true;
     }
+    // Overlay logo & scrolling text fields
+    if ('overlay_logo_path' in req.body) updateData.overlay_logo_path = req.body.overlay_logo_path || null;
+    if ('overlay_logo_position' in req.body) updateData.overlay_logo_position = req.body.overlay_logo_position || 'bottom-right';
+    if ('overlay_logo_scale' in req.body) updateData.overlay_logo_scale = req.body.overlay_logo_scale ? parseFloat(req.body.overlay_logo_scale) : null;
+    if ('overlay_logo_opacity' in req.body) updateData.overlay_logo_opacity = req.body.overlay_logo_opacity ? parseFloat(req.body.overlay_logo_opacity) : null;
+    if ('scrolling_text' in req.body) updateData.scrolling_text = req.body.scrolling_text || null;
+    if ('scrolling_text_speed' in req.body) updateData.scrolling_text_speed = req.body.scrolling_text_speed ? parseInt(req.body.scrolling_text_speed) : null;
+    if ('scrolling_text_position' in req.body) updateData.scrolling_text_position = req.body.scrolling_text_position || 'bottom';
+    if ('scrolling_text_color' in req.body) updateData.scrolling_text_color = req.body.scrolling_text_color || null;
+    if ('scrolling_text_bg_color' in req.body) updateData.scrolling_text_bg_color = req.body.scrolling_text_bg_color || null;
+    if ('scrolling_text_bg_opacity' in req.body) updateData.scrolling_text_bg_opacity = req.body.scrolling_text_bg_opacity != null ? parseInt(req.body.scrolling_text_bg_opacity) : 80;
+    if ('scrolling_text_size' in req.body) updateData.scrolling_text_size = req.body.scrolling_text_size ? parseInt(req.body.scrolling_text_size) : null;
     const serverTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     function parseLocalDateTime(dateTimeString) {
@@ -3630,6 +3935,52 @@ app.delete('/api/streams/:id', isAuthenticated, async (req, res) => {
     }
     if (stream.user_id !== req.session.userId) {
       return res.status(403).json({ success: false, error: 'Not authorized to delete this stream' });
+    }
+    if (stream.overlay_logo_path) {
+      const logoFile = path.join(__dirname, 'public', stream.overlay_logo_path);
+      if (fs.existsSync(logoFile)) fs.unlink(logoFile, () => {});
+    }
+    if (stream.is_youtube_api && (stream.youtube_broadcast_id || stream.youtube_stream_id)) {
+      try {
+        const user = await User.findById(req.session.userId);
+        if (user.youtube_client_id && user.youtube_client_secret) {
+          const YoutubeChannel = require('./models/YoutubeChannel');
+          let selectedChannel = await YoutubeChannel.findById(stream.youtube_channel_id);
+          if (!selectedChannel) selectedChannel = await YoutubeChannel.findDefault(req.session.userId);
+
+          if (selectedChannel && selectedChannel.access_token) {
+            const { decrypt } = require('./utils/encryption');
+            const clientSecret = decrypt(user.youtube_client_secret);
+            const accessToken = decrypt(selectedChannel.access_token);
+            const refreshToken = decrypt(selectedChannel.refresh_token);
+
+            const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+            const host = req.headers['x-forwarded-host'] || req.get('host');
+            const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
+
+            const oauth2Client = getYouTubeOAuth2Client(user.youtube_client_id, clientSecret, redirectUri);
+            oauth2Client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+            const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
+
+            if (stream.youtube_broadcast_id) {
+              try {
+                await youtube.liveBroadcasts.delete({ id: stream.youtube_broadcast_id });
+              } catch (e) {
+                console.log('Note: Could not delete YouTube broadcast:', e.message);
+              }
+            }
+            if (stream.youtube_stream_id) {
+              try {
+                await youtube.liveStreams.delete({ id: stream.youtube_stream_id });
+              } catch (e) {
+                console.log('Note: Could not delete YouTube live stream:', e.message);
+              }
+            }
+          }
+        }
+      } catch (ytError) {
+        console.log('Note: Could not delete YouTube resources:', ytError.message);
+      }
     }
     await Stream.delete(req.params.id, req.session.userId);
     res.json({ success: true, message: 'Stream deleted successfully' });
@@ -4370,7 +4721,10 @@ app.get('/api/rotations/:id', isAuthenticated, async (req, res) => {
 
 app.post('/api/rotations', isAuthenticated, uploadThumbnail.array('thumbnails'), async (req, res) => {
   try {
-    const { name, repeat_mode, start_time, end_time, items, youtube_channel_id } = req.body;
+    const { name, repeat_mode, start_time, end_time, items, youtube_channel_id,
+      overlay_logo_path, overlay_logo_position, overlay_logo_scale, overlay_logo_opacity,
+      scrolling_text, scrolling_text_speed, scrolling_text_position, scrolling_text_color, scrolling_text_bg_color, scrolling_text_bg_opacity, scrolling_text_size
+    } = req.body;
 
     const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
 
@@ -4389,7 +4743,18 @@ app.post('/api/rotations', isAuthenticated, uploadThumbnail.array('thumbnails'),
       start_time,
       end_time,
       repeat_mode: repeat_mode || 'daily',
-      youtube_channel_id: youtube_channel_id || null
+      youtube_channel_id: youtube_channel_id || null,
+      overlay_logo_path: overlay_logo_path || null,
+      overlay_logo_position: overlay_logo_position || 'bottom-right',
+      overlay_logo_scale: overlay_logo_scale ? parseFloat(overlay_logo_scale) : null,
+      overlay_logo_opacity: overlay_logo_opacity ? parseFloat(overlay_logo_opacity) : null,
+      scrolling_text: scrolling_text || null,
+      scrolling_text_speed: scrolling_text_speed ? parseInt(scrolling_text_speed) : null,
+      scrolling_text_position: scrolling_text_position || 'bottom',
+      scrolling_text_color: scrolling_text_color || null,
+      scrolling_text_bg_color: scrolling_text_bg_color || null,
+      scrolling_text_bg_opacity: scrolling_text_bg_opacity != null ? parseInt(scrolling_text_bg_opacity) : 80,
+      scrolling_text_size: scrolling_text_size ? parseInt(scrolling_text_size) : null
     });
 
     const uploadedFiles = req.files || [];
@@ -4446,7 +4811,10 @@ app.put('/api/rotations/:id', isAuthenticated, uploadThumbnail.array('thumbnails
       return res.status(403).json({ success: false, error: 'Not authorized' });
     }
 
-    const { name, repeat_mode, start_time, end_time, items, youtube_channel_id } = req.body;
+    const { name, repeat_mode, start_time, end_time, items, youtube_channel_id,
+      overlay_logo_path, overlay_logo_position, overlay_logo_scale, overlay_logo_opacity,
+      scrolling_text, scrolling_text_speed, scrolling_text_position, scrolling_text_color, scrolling_text_bg_color, scrolling_text_bg_opacity, scrolling_text_size
+    } = req.body;
 
     const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
 
@@ -4456,7 +4824,18 @@ app.put('/api/rotations/:id', isAuthenticated, uploadThumbnail.array('thumbnails
       start_time,
       end_time,
       repeat_mode: repeat_mode || 'daily',
-      youtube_channel_id: youtube_channel_id || null
+      youtube_channel_id: youtube_channel_id || null,
+      overlay_logo_path: overlay_logo_path || null,
+      overlay_logo_position: overlay_logo_position || 'bottom-right',
+      overlay_logo_scale: overlay_logo_scale ? parseFloat(overlay_logo_scale) : null,
+      overlay_logo_opacity: overlay_logo_opacity ? parseFloat(overlay_logo_opacity) : null,
+      scrolling_text: scrolling_text || null,
+      scrolling_text_speed: scrolling_text_speed ? parseInt(scrolling_text_speed) : null,
+      scrolling_text_position: scrolling_text_position || 'bottom',
+      scrolling_text_color: scrolling_text_color || null,
+      scrolling_text_bg_color: scrolling_text_bg_color || null,
+      scrolling_text_bg_opacity: scrolling_text_bg_opacity != null ? parseInt(scrolling_text_bg_opacity) : 80,
+      scrolling_text_size: scrolling_text_size ? parseInt(scrolling_text_size) : null
     });
 
     const existingItems = await Rotation.getItemsByRotationId(req.params.id);
@@ -4522,6 +4901,10 @@ app.delete('/api/rotations/:id', isAuthenticated, async (req, res) => {
       await rotationService.stopRotation(req.params.id);
     }
 
+    if (rotation.overlay_logo_path) {
+      const logoFile = path.join(__dirname, 'public', rotation.overlay_logo_path);
+      if (fs.existsSync(logoFile)) fs.unlink(logoFile, () => {});
+    }
     await Rotation.delete(req.params.id, req.session.userId);
     res.json({ success: true, message: 'Rotation deleted' });
   } catch (error) {

@@ -101,105 +101,158 @@
     </div>
   </div>
 
-  <% if (pagination.totalCount > 0) { %>
-  <div class="mt-6 flex items-center justify-between">
-    <p class="text-sm text-gray-400">
-      Showing <%= ((pagination.page - 1) * pagination.limit) + 1 %>-<%= Math.min(pagination.page * pagination.limit, pagination.totalCount) %> of <%= pagination.totalCount %> entries
-    </p>
-    
-    <% if (pagination.totalPages > 1) { %>
-    <div class="flex items-center gap-2">
-      <a href="?page=<%= Math.max(1, pagination.page - 1) %>&sort=<%= pagination.sort %>&platform=<%= pagination.platform %>&search=<%= pagination.search %>&limit=<%= pagination.limit %>"
-        class="w-9 h-9 flex items-center justify-center rounded-lg <%= pagination.page === 1 ? 'bg-dark-700 text-gray-400 cursor-not-allowed pointer-events-none' : 'bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white transition-colors' %>">
-        <i class="ti ti-chevron-left"></i>
-      </a>
-      
-      <% 
-        let startPage = Math.max(1, pagination.page - 2);
-        let endPage = Math.min(pagination.totalPages, pagination.page + 2);
-        if (endPage - startPage < 4) {
-          if (startPage === 1) {
-            endPage = Math.min(pagination.totalPages, startPage + 4);
-          } else {
-            startPage = Math.max(1, endPage - 4);
-          }
-        }
-      %>
-      <% for (let i = startPage; i <= endPage; i++) { %>
-        <a href="?page=<%= i %>&sort=<%= pagination.sort %>&platform=<%= pagination.platform %>&search=<%= pagination.search %>&limit=<%= pagination.limit %>"
-          class="w-9 h-9 flex items-center justify-center rounded-lg <%= i === pagination.page ? 'bg-primary text-white' : 'bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white transition-colors' %>">
-          <%= i %>
-        </a>
-      <% } %>
-      
-      <a href="?page=<%= Math.min(pagination.totalPages, pagination.page + 1) %>&sort=<%= pagination.sort %>&platform=<%= pagination.platform %>&search=<%= pagination.search %>&limit=<%= pagination.limit %>"
-        class="w-9 h-9 flex items-center justify-center rounded-lg <%= pagination.page === pagination.totalPages ? 'bg-dark-700 text-gray-400 cursor-not-allowed pointer-events-none' : 'bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white transition-colors' %>">
-        <i class="ti ti-chevron-right"></i>
-      </a>
-      
-      <select id="limit-select" class="ml-2 w-16 bg-dark-700 border border-gray-600 text-gray-300 px-2 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary">
-        <option value="10" <%= pagination.limit === 10 ? 'selected' : '' %>>10</option>
-        <option value="25" <%= pagination.limit === 25 ? 'selected' : '' %>>25</option>
-        <option value="50" <%= pagination.limit === 50 ? 'selected' : '' %>>50</option>
-        <option value="100" <%= pagination.limit === 100 ? 'selected' : '' %>>100</option>
-      </select>
-    </div>
-    <% } %>
-  </div>
-  <% } %>
+  <div id="pagination-wrapper"></div>
 
   <script>
-    function buildUrl(params = {}) {
-      const currentParams = {
-        page: '<%= pagination.page %>',
-        sort: '<%= pagination.sort %>',
-        platform: '<%= pagination.platform %>',
-        search: '<%= pagination.search %>',
-        limit: '<%= pagination.limit %>'
-      };
-      const merged = { ...currentParams, ...params };
-      const searchParams = new URLSearchParams();
-      Object.entries(merged).forEach(([key, value]) => {
-        if (value) searchParams.set(key, value);
-      });
-      return '/history?' + searchParams.toString();
+    // --- State ---
+    let currentPage = parseInt('<%= pagination.page %>');
+    let currentLimit = parseInt('<%= pagination.limit %>');
+    let currentSearch = '<%= pagination.search %>';
+    let currentSort = '<%= pagination.sort %>';
+    let currentPlatform = '<%= pagination.platform %>';
+
+    // --- Helpers (mirror server-side helpers) ---
+    function getPlatformIcon(p) {
+      return { YouTube:'youtube', Facebook:'facebook', Twitch:'twitch', TikTok:'tiktok', Instagram:'instagram', 'Shopee Live':'shopping-bag', 'Restream.io':'live-photo' }[p] || 'broadcast';
+    }
+    function getPlatformColor(p) {
+      return { YouTube:'red-500', Facebook:'blue-500', Twitch:'purple-500', TikTok:'gray-100', Instagram:'pink-500', 'Shopee Live':'orange-500', 'Restream.io':'teal-500' }[p] || 'gray-400';
+    }
+    function formatDateTime(iso) {
+      if (!iso) return '--';
+      return new Date(iso).toLocaleString('en-US', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:false });
+    }
+    function formatDuration(s) {
+      if (!s) return '--';
+      const h = Math.floor(s/3600).toString().padStart(2,'0');
+      const m = Math.floor((s%3600)/60).toString().padStart(2,'0');
+      const sc = Math.floor(s%60).toString().padStart(2,'0');
+      return `${h}:${m}:${sc}`;
+    }
+    function escapeHtml(str) {
+      return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    // --- Render row ---
+    function renderRow(entry) {
+      const icon = getPlatformIcon(entry.platform);
+      const color = getPlatformColor(entry.platform);
+      const thumb = entry.thumbnail_path
+        ? `<img src="${escapeHtml(entry.thumbnail_path)}" class="w-full h-full object-cover" onerror="this.src='/images/default-thumbnail.jpg'">`
+        : `<div class="w-full h-full bg-dark-600 flex items-center justify-center"><i class="ti ti-video text-gray-400 text-xs"></i></div>`;
+      return `
+        <tr class="hover:bg-dark-700/50 transition-colors" data-id="${entry.id}">
+          <td class="px-4 py-4 w-10"><input type="checkbox" class="row-checkbox w-4 h-4 rounded border-gray-600 bg-dark-700 cursor-pointer accent-primary" value="${entry.id}"></td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="flex items-center">
+              <div class="w-10 h-6 bg-dark-700 rounded flex-shrink-0 overflow-hidden mr-3">${thumb}</div>
+              <div class="text-sm font-medium">${escapeHtml(entry.title)}</div>
+            </div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="flex items-center">
+              <i class="ti ti-brand-${icon} text-${color} mr-1.5"></i>
+              <span class="text-sm">${escapeHtml(entry.platform||'Custom')}</span>
+            </div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">${formatDateTime(entry.start_time)}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">${formatDateTime(entry.end_time)}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm">${formatDuration(entry.duration)}</td>
+        </tr>`;
+    }
+
+    // --- Render pagination ---
+    function renderPagination(pag) {
+      const wrapper = document.getElementById('pagination-wrapper');
+      if (!pag || pag.totalCount === 0) { wrapper.innerHTML = ''; return; }
+      const { page, limit, totalCount, totalPages } = pag;
+      const start = (page-1)*limit+1, end = Math.min(page*limit, totalCount);
+
+      const limitOpts = [10,25,50,100].map(v => `<option value="${v}" ${limit===v?'selected':''}>${v}</option>`).join('');
+
+      let pages = '';
+      if (totalPages > 1) {
+        let sp = Math.max(1,page-2), ep = Math.min(totalPages,page+2);
+        if (ep-sp < 4) { sp===1 ? ep=Math.min(totalPages,sp+4) : sp=Math.max(1,ep-4); }
+        pages += `<button onclick="goToPage(${Math.max(1,page-1)})" ${page===1?'disabled':''} class="w-9 h-9 flex items-center justify-center rounded-lg ${page===1?'bg-dark-700 text-gray-400 cursor-not-allowed':'bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white transition-colors'}"><i class="ti ti-chevron-left"></i></button>`;
+        for (let i=sp;i<=ep;i++) {
+          pages += `<button onclick="goToPage(${i})" class="w-9 h-9 flex items-center justify-center rounded-lg ${i===page?'bg-primary text-white':'bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white transition-colors'}">${i}</button>`;
+        }
+        pages += `<button onclick="goToPage(${Math.min(totalPages,page+1)})" ${page===totalPages?'disabled':''} class="w-9 h-9 flex items-center justify-center rounded-lg ${page===totalPages?'bg-dark-700 text-gray-400 cursor-not-allowed':'bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white transition-colors'}"><i class="ti ti-chevron-right"></i></button>`;
+      }
+
+      wrapper.innerHTML = `
+        <div class="mt-6 flex items-center justify-between">
+          <p class="text-sm text-gray-400">Showing ${start}-${end} of ${totalCount} entries</p>
+          <div class="flex items-center gap-2">
+            ${pages}
+            <select onchange="changeLimit(this.value)" class="ml-2 w-16 bg-dark-700 border border-gray-600 text-gray-300 px-2 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary">${limitOpts}</select>
+          </div>
+        </div>`;
+    }
+
+    // --- Fetch & render ---
+    function fetchHistory(params = {}) {
+      if (params.page !== undefined) currentPage = params.page;
+      if (params.limit !== undefined) currentLimit = params.limit;
+      if (params.search !== undefined) currentSearch = params.search;
+      if (params.sort !== undefined) currentSort = params.sort;
+      if (params.platform !== undefined) currentPlatform = params.platform;
+
+      const tbody = document.getElementById('history-table-body');
+      tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-10 text-center text-gray-400"><div class="animate-spin inline-block w-6 h-6 border-2 border-gray-500 border-t-primary rounded-full"></div></td></tr>`;
+
+      const q = new URLSearchParams({ page: currentPage, limit: currentLimit, sort: currentSort, platform: currentPlatform });
+      if (currentSearch) q.set('search', currentSearch);
+
+      fetch('/api/history?' + q.toString())
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success) return;
+          if (data.history.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-10 text-center text-gray-400"><div class="flex flex-col items-center"><i class="ti ti-history text-3xl mb-2"></i><p>No stream history found</p></div></td></tr>`;
+          } else {
+            tbody.innerHTML = data.history.map(renderRow).join('');
+          }
+          renderPagination(data.pagination);
+          // Reset select-all
+          const selectAll = document.getElementById('select-all');
+          if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; }
+          updateSelectionUI();
+        })
+        .catch(() => {
+          tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-10 text-center text-red-400">Failed to load history</td></tr>`;
+        });
+    }
+
+    function goToPage(page) { fetchHistory({ page }); }
+    function changeLimit(limit) { fetchHistory({ limit: parseInt(limit), page: 1 }); }
+
+    // --- Input listeners (AJAX, no page reload) ---
     function debounce(func, wait) {
-      let timeout;
-      return function(...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func(...args), wait);
-      };
+      let t;
+      return function(...args) { clearTimeout(t); t = setTimeout(() => func(...args), wait); };
     }
 
     const searchInput = document.getElementById('history-search');
+    searchInput.focus();
+    const len = searchInput.value.length;
+    searchInput.setSelectionRange(len, len);
+
     const handleSearch = debounce(function() {
-      window.location.href = buildUrl({ search: searchInput.value, page: 1 });
-    }, 500);
-    
+      fetchHistory({ search: searchInput.value, page: 1 });
+    }, 300);
     searchInput.addEventListener('input', handleSearch);
     searchInput.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        window.location.href = buildUrl({ search: searchInput.value, page: 1 });
-      }
+      if (e.key === 'Enter') { e.preventDefault(); fetchHistory({ search: this.value, page: 1 }); }
     });
 
     document.getElementById('platform-filter').addEventListener('change', function() {
-      window.location.href = buildUrl({ platform: this.value, page: 1 });
+      fetchHistory({ platform: this.value, page: 1 });
     });
-
     document.getElementById('sort-filter').addEventListener('change', function() {
-      window.location.href = buildUrl({ sort: this.value, page: 1 });
+      fetchHistory({ sort: this.value, page: 1 });
     });
-
-    const limitSelect = document.getElementById('limit-select');
-    if (limitSelect) {
-      limitSelect.addEventListener('change', function() {
-        window.location.href = buildUrl({ limit: this.value, page: 1 });
-      });
-    }
 
     // --- Checkbox logic ---
     function updateSelectionUI() {
@@ -208,24 +261,19 @@
       const btn = document.getElementById('delete-selected-btn');
       const countEl = document.getElementById('selected-count');
       const selectAll = document.getElementById('select-all');
-
       countEl.textContent = checked.length;
-      if (checked.length > 0) {
-        btn.classList.remove('hidden');
-        btn.classList.add('flex');
-      } else {
-        btn.classList.add('hidden');
-        btn.classList.remove('flex');
+      if (checked.length > 0) { btn.classList.remove('hidden'); btn.classList.add('flex'); }
+      else { btn.classList.add('hidden'); btn.classList.remove('flex'); }
+      if (selectAll) {
+        selectAll.indeterminate = checked.length > 0 && checked.length < checkboxes.length;
+        selectAll.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
       }
-      selectAll.indeterminate = checked.length > 0 && checked.length < checkboxes.length;
-      selectAll.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
     }
 
     document.getElementById('select-all').addEventListener('change', function() {
       document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = this.checked);
       updateSelectionUI();
     });
-
     document.getElementById('history-table-body').addEventListener('change', function(e) {
       if (e.target.classList.contains('row-checkbox')) updateSelectionUI();
     });
@@ -237,48 +285,81 @@
       setTimeout(() => { row.remove(); if (onDone) onDone(); }, 300);
     }
 
-    function checkEmptyTable() {
-      if (!document.querySelector('#history-table-body tr[data-id]')) {
-        document.getElementById('history-table-body').innerHTML = `
-          <tr><td colspan="6" class="px-6 py-10 text-center text-gray-400">
-            <div class="flex flex-col items-center">
-              <i class="ti ti-history text-3xl mb-2"></i>
-              <p>No stream history found</p>
-            </div>
-          </td></tr>`;
-      }
-    }
-
     async function deleteSelected() {
       const checked = document.querySelectorAll('.row-checkbox:checked');
       if (!checked.length) return;
       const ids = Array.from(checked).map(cb => cb.value);
-      if (!confirm(`Delete ${ids.length} selected entr${ids.length > 1 ? 'ies' : 'y'}?`)) return;
+      const result = await createModalDialog({
+        type: 'danger', icon: 'ti-trash', title: 'Delete History',
+        message: `Delete ${ids.length} selected entr${ids.length > 1 ? 'ies' : 'y'}? This action cannot be undone.`,
+        confirmText: 'Delete', confirmClass: 'bg-red-500 hover:bg-red-600'
+      });
+      if (!result.confirmed) return;
 
       let successCount = 0;
-      const rows = ids.map(id => document.querySelector(`tr[data-id="${id}"]`)).filter(Boolean);
-
       for (const id of ids) {
         try {
           const r = await fetch(`/api/history/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
           const data = await r.json();
-          if (data.success) {
-            successCount++;
-            const row = document.querySelector(`tr[data-id="${id}"]`);
-            if (row) removeRowAnimated(row);
-          }
+          if (data.success) { successCount++; const row = document.querySelector(`tr[data-id="${id}"]`); if (row) removeRowAnimated(row); }
         } catch (e) { /* skip */ }
       }
 
-      setTimeout(() => {
-        checkEmptyTable();
-        updateSelectionUI();
-      }, 400);
-
-      if (successCount > 0) showToast(`Deleted ${successCount} entr${successCount > 1 ? 'ies' : 'y'}`);
+      if (successCount > 0) {
+        showToast(`Deleted ${successCount} entr${successCount > 1 ? 'ies' : 'y'}`);
+        setTimeout(() => fetchHistory({ page: currentPage }), 400);
+      }
     }
 
+    // --- Initial pagination render ---
+    renderPagination({
+      page: parseInt('<%= pagination.page %>'),
+      limit: parseInt('<%= pagination.limit %>'),
+      totalCount: parseInt('<%= pagination.totalCount %>'),
+      totalPages: parseInt('<%= pagination.totalPages %>'),
+      sort: '<%= pagination.sort %>',
+      platform: '<%= pagination.platform %>',
+      search: '<%= pagination.search %>'
+    });
 
+    function createModalDialog(options) {
+      const dialog = document.createElement('div');
+      dialog.id = 'custom-modal';
+      dialog.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm';
+      const themes = {
+        'info': { icon: options.icon || 'ti-info-circle', color: 'text-primary', bg: 'bg-primary/10', button: 'bg-primary hover:bg-blue-600' },
+        'danger': { icon: options.icon || 'ti-alert-triangle', color: 'text-red-400', bg: 'bg-red-500/10', button: 'bg-red-500 hover:bg-red-600' }
+      };
+      const theme = themes[options.type || 'info'];
+      dialog.innerHTML = `
+        <div class="max-w-md w-full mx-4">
+          <div class="bg-dark-800 rounded-lg shadow-xl overflow-hidden">
+            <div class="p-6">
+              <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded-full ${theme.bg} flex items-center justify-center shrink-0">
+                  <i class="ti ${theme.icon} ${theme.color} text-2xl"></i>
+                </div>
+                <div class="flex-1">
+                  <h3 class="text-lg font-semibold">${options.title}</h3>
+                  <p class="text-gray-400 text-sm mt-1">${options.message}</p>
+                </div>
+              </div>
+            </div>
+            <div class="flex justify-end gap-3 p-4 border-t border-gray-700">
+              <button id="modal-cancel-btn" class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg transition-colors">Cancel</button>
+              <button id="modal-confirm-btn" class="${options.confirmClass || theme.button} px-4 py-2 text-white rounded-lg transition-colors">${options.confirmText || 'Confirm'}</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(dialog);
+      document.body.classList.add('overflow-hidden');
+      return new Promise((resolve) => {
+        const close = (confirmed = false) => { document.body.classList.remove('overflow-hidden'); dialog.remove(); resolve({ confirmed }); };
+        document.getElementById('modal-confirm-btn').addEventListener('click', () => close(true));
+        document.getElementById('modal-cancel-btn').addEventListener('click', () => close());
+        dialog.addEventListener('click', (e) => { if (e.target === dialog) close(); });
+      });
+    }
 
     function showToast(message) {
       const toast = document.createElement('div');
@@ -286,10 +367,7 @@
       toast.style.animation = 'fadeIn 0.3s';
       toast.innerHTML = `<div class="flex items-center"><i class="ti ti-check text-green-400 mr-2"></i><span>${message}</span></div>`;
       document.body.appendChild(toast);
-      setTimeout(() => {
-        toast.style.animation = 'fadeOut 0.3s';
-        setTimeout(() => toast.remove(), 300);
-      }, 3000);
+      setTimeout(() => { toast.style.animation = 'fadeOut 0.3s'; setTimeout(() => toast.remove(), 300); }, 3000);
     }
   </script>
 

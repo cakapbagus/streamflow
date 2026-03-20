@@ -384,6 +384,113 @@
             </div>
           </div>
 
+          <!-- Overlay & Scrolling Text for Rotation -->
+          <div class="border-t border-gray-700 pt-4">
+            <button type="button" id="rotOverlayToggle" onclick="toggleRotOverlay()"
+              class="flex items-center justify-between w-full text-left mb-2">
+              <div class="flex items-center gap-2">
+                <i class="ti ti-layout text-gray-400"></i>
+                <span class="text-sm font-medium text-white">Overlay & Scrolling Text</span>
+              </div>
+              <i id="rotOverlayChevron" class="ti ti-chevron-down text-gray-400 transition-transform"></i>
+            </button>
+            <div id="rotOverlaySectionContent" class="hidden space-y-4 pb-2">
+              <!-- Logo -->
+              <div class="bg-dark-700/50 rounded-lg p-4 space-y-3">
+                <p class="text-xs font-medium text-gray-300 uppercase tracking-wider">Logo Overlay</p>
+                <div class="flex items-center gap-3">
+                  <div id="rotLogoPreview" class="w-16 h-12 bg-dark-700 rounded border border-gray-600 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    <span class="text-xs text-gray-500">No logo</span>
+                  </div>
+                  <div class="flex-1 space-y-1">
+                    <input type="file" id="rotLogoFileInput" accept=".png,.jpg,.gif,.webp" class="hidden"
+                      onchange="handleRotLogoUpload(this)">
+                    <button type="button" onclick="document.getElementById('rotLogoFileInput').click()"
+                      class="px-3 py-1.5 bg-dark-600 hover:bg-dark-500 border border-gray-600 rounded text-xs text-white transition-colors">
+                      <i class="ti ti-upload mr-1"></i>Upload Logo
+                    </button>
+                    <button type="button" id="rotLogoClearBtn" onclick="clearRotLogo()" class="hidden ml-2 px-2 py-1.5 bg-red-900/30 hover:bg-red-900/50 border border-red-700/50 rounded text-xs text-red-400 transition-colors"><i class="ti ti-x"></i></button>
+                    <p class="text-xs text-gray-500">PNG/JPG/GIF/WebP, max 2MB</p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3" id="rotLogoOptions" style="opacity:0.5;pointer-events:none">
+                  <div>
+                    <label class="text-xs text-gray-400 block mb-1">Position</label>
+                    <select id="rotLogoPosition" class="w-full h-9 px-2 bg-dark-700 border border-gray-600 rounded text-xs">
+                      <option value="bottom-right">Bottom Right</option>
+                      <option value="bottom-left">Bottom Left</option>
+                      <option value="center">Center</option>
+                      <option value="top-right">Top Right</option>
+                      <option value="top-left">Top Left</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-400 block mb-1">Scale <span id="rotScaleVal" class="text-primary">15%</span></label>
+                    <input type="range" id="rotLogoScale" min="2" max="50" value="15"
+                      oninput="document.getElementById('rotScaleVal').textContent=this.value+'%'"
+                      class="w-full h-1.5 accent-primary cursor-pointer">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-400 block mb-1">Opacity <span id="rotOpacityVal" class="text-primary">100%</span></label>
+                    <input type="range" id="rotLogoOpacity" min="0" max="100" value="100"
+                      oninput="document.getElementById('rotOpacityVal').textContent=this.value+'%'"
+                      class="w-full h-1.5 accent-primary cursor-pointer">
+                  </div>
+                </div>
+              </div>
+              <!-- Scrolling Text -->
+              <div class="bg-dark-700/50 rounded-lg p-4 space-y-3">
+                <p class="text-xs font-medium text-gray-300 uppercase tracking-wider">Scrolling Text (Ticker)</p>
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">Text Content</label>
+                  <input type="text" id="rotScrollText" placeholder="Enter ticker text... (leave empty to disable)"
+                    class="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="text-xs text-gray-400 block mb-1">Position</label>
+                    <select id="rotTextPosition" class="w-full h-9 px-2 bg-dark-700 border border-gray-600 rounded text-xs">
+                      <option value="bottom" selected>Bottom</option>
+                      <option value="top">Top</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-400 block mb-1">Speed <span id="rotSpeedVal" class="text-primary">80</span> px/s</label>
+                    <input type="range" id="rotTextSpeed" min="20" max="300" value="80"
+                      oninput="document.getElementById('rotSpeedVal').textContent=this.value"
+                      class="w-full h-1.5 accent-primary cursor-pointer">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-400 block mb-1">Text Color</label>
+                    <input type="color" id="rotTextColor" value="#ffffff"
+                      class="w-full h-9 bg-dark-700 border border-gray-600 rounded cursor-pointer p-0.5">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-400 block mb-1">Font Size <span id="rotSizeVal" class="text-primary">28px</span></label>
+                    <input type="range" id="rotTextSize" min="12" max="80" value="28"
+                      oninput="document.getElementById('rotSizeVal').textContent=this.value+'px'"
+                      class="w-full h-1.5 accent-primary cursor-pointer">
+                  </div>
+                </div>
+                <div class="space-y-2 mt-1">
+                  <div>
+                    <label class="text-xs text-gray-400 block mb-1">Background Color</label>
+                    <input type="color" id="rotTextBgColor" value="#000000"
+                      style="opacity:0.8"
+                      oninput="document.getElementById('rotTextBgColor').style.opacity=document.getElementById('rotTextBgOpacity').value/100"
+                      class="w-full h-9 bg-dark-700 border border-gray-600 rounded cursor-pointer p-0.5">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-400 block mb-1">BG Opacity <span id="rotBgOpacityVal" class="text-primary">80%</span></label>
+                    <input type="range" id="rotTextBgOpacity" min="0" max="100" value="80"
+                      oninput="document.getElementById('rotBgOpacityVal').textContent=this.value+'%'; document.getElementById('rotTextBgColor').style.opacity=this.value/100"
+                      class="w-full h-1.5 accent-primary cursor-pointer">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="border-t border-gray-700 pt-4">
             <h4 class="text-sm font-medium text-white mb-4">Rotation Items</h4>
             <div id="rotationItemsContainer" class="space-y-4"></div>
@@ -496,6 +603,37 @@ function buildVideoFolderNav(navEl, activeFolder, onSelect) {
 }
 const csrfToken = '<%= csrfToken %>';
 let rotationItemCount = 0;
+let _rotLogoPath = '';
+let _rotLogoOriginal = '';
+let _rotLogoUploaded = [];
+let _rotLogoSaved = false;
+
+function _rotDeleteLogoFiles(paths) {
+  const toDelete = paths.filter(p => p && typeof p === 'string');
+  if (!toDelete.length) return;
+  fetch('/api/upload/logo', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+    body: JSON.stringify({ paths: toDelete })
+  }).catch(() => {});
+}
+
+function _rotCleanupLogoOnSave() {
+  const active = _rotLogoPath;
+  const toDelete = [];
+  if (_rotLogoOriginal && _rotLogoOriginal !== active) toDelete.push(_rotLogoOriginal);
+  _rotLogoUploaded.forEach(p => { if (p !== active) toDelete.push(p); });
+  _rotDeleteLogoFiles(toDelete);
+  _rotLogoUploaded = [];
+  _rotLogoOriginal = active;
+  _rotLogoSaved = true;
+}
+
+function _rotCleanupLogoOnCancel() {
+  if (_rotLogoSaved) { _rotLogoSaved = false; return; }
+  _rotDeleteLogoFiles(_rotLogoUploaded);
+  _rotLogoUploaded = [];
+}
 
 function updateRotationServerTime() {
   fetch('/api/server-time')
@@ -587,6 +725,10 @@ function openCreateRotationModal() {
   document.getElementById('rotationItemsContainer').innerHTML = '';
   rotationItemCount = 0;
   addRotationItem();
+  resetRotOverlay();
+  _rotLogoOriginal = '';
+  _rotLogoUploaded = [];
+  _rotLogoSaved = false;
   document.body.style.overflow = 'hidden';
   modal.classList.remove('hidden');
   requestAnimationFrame(() => {
@@ -597,6 +739,7 @@ function openCreateRotationModal() {
 function closeCreateRotationModal() {
   const modal = document.getElementById('createRotationModal');
   modal.classList.remove('active');
+  _rotCleanupLogoOnCancel();
   setTimeout(() => {
     modal.classList.add('hidden');
     document.body.style.overflow = '';
@@ -972,6 +1115,85 @@ function selectRotationChannel(channelId, channelName, channelThumbnail) {
   toggleRotationChannelDropdown();
 }
 
+function toggleRotOverlay() {
+  const content = document.getElementById('rotOverlaySectionContent');
+  const chevron = document.getElementById('rotOverlayChevron');
+  const isHidden = content.classList.contains('hidden');
+  content.classList.toggle('hidden', !isHidden);
+  chevron.style.transform = isHidden ? 'rotate(180deg)' : '';
+}
+
+async function handleRotLogoUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const allowed = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+  if (!allowed.includes(file.type)) {
+    showToast('error', 'Invalid file type. Use PNG/JPG/GIF/WebP');
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('error', 'Logo must be under 2MB');
+    return;
+  }
+  const fd = new FormData();
+  fd.append('logo', file);
+  try {
+    const res = await fetch('/api/upload/logo', {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': csrfToken },
+      body: fd
+    });
+    const data = await res.json();
+    if (data.success) {
+      _rotLogoPath = data.path;
+      _rotLogoUploaded.push(data.path);
+      const preview = document.getElementById('rotLogoPreview');
+      preview.innerHTML = `<img src="${data.path}" class="w-full h-full object-contain" alt="Logo">`;
+      document.getElementById('rotLogoClearBtn').classList.remove('hidden');
+      const opts = document.getElementById('rotLogoOptions');
+      opts.style.opacity = '1';
+      opts.style.pointerEvents = 'auto';
+    } else {
+      showToast('error', data.error || 'Upload failed');
+    }
+  } catch (e) {
+    showToast('error', 'Upload failed');
+  }
+}
+
+function clearRotLogo() {
+  _rotLogoPath = '';
+  const preview = document.getElementById('rotLogoPreview');
+  preview.innerHTML = '<span class="text-xs text-gray-500">No logo</span>';
+  document.getElementById('rotLogoClearBtn').classList.add('hidden');
+  document.getElementById('rotLogoFileInput').value = '';
+  const opts = document.getElementById('rotLogoOptions');
+  opts.style.opacity = '0.5';
+  opts.style.pointerEvents = 'none';
+}
+
+function resetRotOverlay() {
+  clearRotLogo();
+  document.getElementById('rotLogoPosition').value = 'bottom-right';
+  document.getElementById('rotLogoScale').value = 15;
+  document.getElementById('rotScaleVal').textContent = '15%';
+  document.getElementById('rotLogoOpacity').value = 100;
+  document.getElementById('rotOpacityVal').textContent = '100%';
+  document.getElementById('rotScrollText').value = '';
+  document.getElementById('rotTextPosition').value = 'bottom';
+  document.getElementById('rotTextSpeed').value = 80;
+  document.getElementById('rotSpeedVal').textContent = '80';
+  document.getElementById('rotTextColor').value = '#ffffff';
+  document.getElementById('rotTextBgColor').value = '#000000';
+  document.getElementById('rotTextBgOpacity').value = 80;
+  document.getElementById('rotBgOpacityVal').textContent = '80%';
+  document.getElementById('rotTextSize').value = 28;
+  document.getElementById('rotSizeVal').textContent = '28px';
+  // Collapse panel
+  document.getElementById('rotOverlaySectionContent').classList.add('hidden');
+  document.getElementById('rotOverlayChevron').style.transform = '';
+}
+
 async function saveRotation() {
   const rotationId = document.getElementById('rotationId').value;
   const name = document.getElementById('rotationName').value;
@@ -1081,6 +1303,19 @@ async function saveRotation() {
   formData.append('end_time', endDateTimeStr);
   formData.append('youtube_channel_id', youtubeChannelId);
   formData.append('items', JSON.stringify(items));
+
+  // Overlay fields
+  formData.append('overlay_logo_path', _rotLogoPath || '');
+  formData.append('overlay_logo_position', document.getElementById('rotLogoPosition').value);
+  formData.append('overlay_logo_scale', parseFloat(document.getElementById('rotLogoScale').value) / 100);
+  formData.append('overlay_logo_opacity', parseFloat(document.getElementById('rotLogoOpacity').value) / 100);
+  formData.append('scrolling_text', document.getElementById('rotScrollText').value);
+  formData.append('scrolling_text_speed', parseInt(document.getElementById('rotTextSpeed').value));
+  formData.append('scrolling_text_position', document.getElementById('rotTextPosition').value);
+  formData.append('scrolling_text_color', document.getElementById('rotTextColor').value.replace('#', ''));
+  formData.append('scrolling_text_bg_color', document.getElementById('rotTextBgColor').value.replace('#', ''));
+  formData.append('scrolling_text_bg_opacity', parseInt(document.getElementById('rotTextBgOpacity').value));
+  formData.append('scrolling_text_size', parseInt(document.getElementById('rotTextSize').value));
   
   try {
     const url = rotationId ? `/api/rotations/${rotationId}` : '/api/rotations';
@@ -1098,6 +1333,7 @@ async function saveRotation() {
     
     if (result.success) {
       showToast('success', rotationId ? 'Rotation updated!' : 'Rotation created!');
+      _rotCleanupLogoOnSave();
       closeCreateRotationModal();
       setTimeout(() => window.location.reload(), 1000);
     } else {
@@ -1225,6 +1461,53 @@ async function editRotation(id) {
         addRotationItem();
       }
       
+      // Populate overlay fields
+      resetRotOverlay();
+      _rotLogoOriginal = rotation.overlay_logo_path || '';
+      _rotLogoUploaded = [];
+      _rotLogoSaved = false;
+      if (rotation.overlay_logo_path) {
+        _rotLogoPath = rotation.overlay_logo_path;
+        const preview = document.getElementById('rotLogoPreview');
+        preview.innerHTML = `<img src="${rotation.overlay_logo_path}" class="w-full h-full object-contain" alt="Logo">`;
+        document.getElementById('rotLogoClearBtn').classList.remove('hidden');
+        const opts = document.getElementById('rotLogoOptions');
+        opts.style.opacity = '1';
+        opts.style.pointerEvents = 'auto';
+      }
+      if (rotation.overlay_logo_position) document.getElementById('rotLogoPosition').value = rotation.overlay_logo_position;
+      if (rotation.overlay_logo_scale != null) {
+        const scaleVal = Math.round(rotation.overlay_logo_scale * 100);
+        document.getElementById('rotLogoScale').value = scaleVal;
+        document.getElementById('rotScaleVal').textContent = scaleVal + '%';
+      }
+      if (rotation.overlay_logo_opacity != null) {
+        const opacVal = Math.round(rotation.overlay_logo_opacity * 100);
+        document.getElementById('rotLogoOpacity').value = opacVal;
+        document.getElementById('rotOpacityVal').textContent = opacVal + '%';
+      }
+      if (rotation.scrolling_text) document.getElementById('rotScrollText').value = rotation.scrolling_text;
+      if (rotation.scrolling_text_position) document.getElementById('rotTextPosition').value = rotation.scrolling_text_position;
+      if (rotation.scrolling_text_speed != null) {
+        document.getElementById('rotTextSpeed').value = rotation.scrolling_text_speed;
+        document.getElementById('rotSpeedVal').textContent = rotation.scrolling_text_speed;
+      }
+      if (rotation.scrolling_text_color) {
+        document.getElementById('rotTextColor').value = '#' + rotation.scrolling_text_color.replace('#', '');
+      }
+      if (rotation.scrolling_text_bg_color) {
+        document.getElementById('rotTextBgColor').value = '#' + rotation.scrolling_text_bg_color.replace('#', '');
+      }
+      if (rotation.scrolling_text_bg_opacity != null) {
+        document.getElementById('rotTextBgOpacity').value = rotation.scrolling_text_bg_opacity;
+        document.getElementById('rotBgOpacityVal').textContent = rotation.scrolling_text_bg_opacity + '%';
+        document.getElementById('rotTextBgColor').style.opacity = rotation.scrolling_text_bg_opacity / 100;
+      }
+      if (rotation.scrolling_text_size != null) {
+        document.getElementById('rotTextSize').value = rotation.scrolling_text_size;
+        document.getElementById('rotSizeVal').textContent = rotation.scrolling_text_size + 'px';
+      }
+
       const modal = document.getElementById('createRotationModal');
       document.body.style.overflow = 'hidden';
       modal.classList.remove('hidden');
@@ -1241,8 +1524,16 @@ async function editRotation(id) {
 }
 
 async function deleteRotation(id) {
-  if (!confirm('Are you sure you want to delete this rotation?')) return;
-  
+  const result = await createModalDialog({
+    type: 'danger',
+    icon: 'ti-trash',
+    title: 'Delete Rotation',
+    message: 'Are you sure you want to delete this rotation? This action cannot be undone.',
+    confirmText: 'Delete',
+    confirmClass: 'bg-red-500 hover:bg-red-600'
+  });
+  if (!result.confirmed) return;
+
   try {
     const response = await fetch(`/api/rotations/${id}`, {
       method: 'DELETE',
@@ -1287,7 +1578,7 @@ async function stopRotation(id) {
       headers: { 'X-CSRF-Token': csrfToken }
     });
     const result = await response.json();
-    
+
     if (result.success) {
       showToast('success', 'Rotation stopped');
       setTimeout(() => window.location.reload(), 1000);
@@ -1297,5 +1588,48 @@ async function stopRotation(id) {
   } catch (error) {
     showToast('error', 'An error occurred');
   }
+}
+
+function createModalDialog(options) {
+  const dialog = document.createElement('div');
+  dialog.id = 'custom-modal';
+  dialog.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm';
+  const themes = {
+    'info': { icon: options.icon || 'ti-info-circle', color: 'text-primary', bg: 'bg-primary/10', button: 'bg-primary hover:bg-blue-600' },
+    'danger': { icon: options.icon || 'ti-alert-triangle', color: 'text-red-400', bg: 'bg-red-500/10', button: 'bg-red-500 hover:bg-red-600' }
+  };
+  const theme = themes[options.type || 'info'];
+  dialog.innerHTML = `
+    <div class="max-w-md w-full mx-4">
+      <div class="bg-dark-800 rounded-lg shadow-xl overflow-hidden">
+        <div class="p-6">
+          <div class="flex items-start gap-4">
+            <div class="w-12 h-12 rounded-full ${theme.bg} flex items-center justify-center shrink-0">
+              <i class="ti ${theme.icon} ${theme.color} text-2xl"></i>
+            </div>
+            <div class="flex-1">
+              <h3 class="text-lg font-semibold">${options.title}</h3>
+              <p class="text-gray-400 text-sm mt-1">${options.message}</p>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 p-4 border-t border-gray-700">
+          <button id="modal-cancel-btn" class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg transition-colors">Cancel</button>
+          <button id="modal-confirm-btn" class="${options.confirmClass || theme.button} px-4 py-2 text-white rounded-lg transition-colors">${options.confirmText || 'Confirm'}</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(dialog);
+  document.body.classList.add('overflow-hidden');
+  return new Promise((resolve) => {
+    const close = (confirmed = false) => {
+      document.body.classList.remove('overflow-hidden');
+      dialog.remove();
+      resolve({ confirmed });
+    };
+    document.getElementById('modal-confirm-btn').addEventListener('click', () => close(true));
+    document.getElementById('modal-cancel-btn').addEventListener('click', () => close());
+    dialog.addEventListener('click', (e) => { if (e.target === dialog) close(); });
+  });
 }
 </script>

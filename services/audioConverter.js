@@ -26,16 +26,27 @@ const getAudioInfo = (filepath) => {
   });
 };
 
-const isAacCodec = async (filepath) => {
+const TARGET_SAMPLE_RATE = 44100;
+const TARGET_CHANNELS = 2;
+
+const isNormalized = async (filepath) => {
   const info = await getAudioInfo(filepath);
-  return info.codec === 'aac';
+  const ext = path.extname(filepath).toLowerCase();
+  return (
+    info.codec === 'aac' &&
+    ext === '.m4a' &&
+    parseInt(info.sampleRate) === TARGET_SAMPLE_RATE &&
+    info.channels === TARGET_CHANNELS
+  );
 };
 
 const convertToAac = (inputPath, outputPath) => {
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
       .audioCodec('aac')
-      .audioBitrate('192k')
+      .audioBitrate('128k')
+      .audioFrequency(TARGET_SAMPLE_RATE)
+      .audioChannels(TARGET_CHANNELS)
       .outputOptions(['-vn'])
       .toFormat('ipod')
       .on('end', () => {
@@ -49,25 +60,24 @@ const convertToAac = (inputPath, outputPath) => {
 };
 
 const processAudioFile = async (inputPath, originalFilename) => {
-  const isAac = await isAacCodec(inputPath);
-  const ext = path.extname(inputPath).toLowerCase();
-  
-  if (isAac && ext === '.m4a') {
+  const alreadyNormalized = await isNormalized(inputPath);
+
+  if (alreadyNormalized) {
     return {
       filepath: inputPath,
       converted: false
     };
   }
-  
+
   const basename = path.basename(inputPath, path.extname(inputPath));
   const outputPath = path.join(path.dirname(inputPath), `${basename}.m4a`);
-  
+
   await convertToAac(inputPath, outputPath);
-  
+
   if (inputPath !== outputPath && fs.existsSync(inputPath)) {
     await fs.remove(inputPath);
   }
-  
+
   return {
     filepath: outputPath,
     converted: true
@@ -83,7 +93,6 @@ const generateAudioThumbnail = (outputPath) => {
 
 module.exports = {
   getAudioInfo,
-  isAacCodec,
   convertToAac,
   processAudioFile,
   generateAudioThumbnail

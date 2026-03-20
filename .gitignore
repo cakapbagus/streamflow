@@ -1,3 +1,7 @@
+# personal settings
+.claude/
+
+# development files
 db/*.db
 logs/
 node_modules

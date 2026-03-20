@@ -387,12 +387,23 @@
                 </div>
               </div>
             </div>
-            <div class="space-y-4">
+            </div>
+
+            <!-- ── Overlay Panel (New Stream) ── -->
+            <div id="newOverlayPanel" class="mt-4 border-t border-gray-700 pt-4">
+              <div id="newOverlayContent"><!-- rendered by renderOverlayPanel('new') --></div>
+            </div>
+
+            <!-- ── Advanced Settings (New Stream) ── -->
+            <div id="newAdvancedSettingsWrapper" class="space-y-4">
               <div class="pt-2 border-t border-gray-700">
                 <button type="button" id="advancedSettingsToggle"
                   class="flex items-center justify-between w-full text-left">
                   <div class="flex items-center">
-                    <span class="text-sm font-medium text-white">Advanced Settings</span>
+                    <div class="flex items-center gap-2">
+                      <i class="ti ti-settings text-gray-400"></i>
+                      <span class="text-sm font-medium text-white">Advanced Settings</span>
+                    </div>
                     <div class="relative ml-2 group">
                       <i class="ti ti-info-circle text-gray-400 hover:text-primary"></i>
                       <div
@@ -424,24 +435,26 @@
                   <div class="space-y-4">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <!-- Hidden fields — diisi otomatis oleh JS -->
-                      <input type="hidden" name="bitrate" id="bitrateSelect" value="3500">
+                      <input type="hidden" name="bitrate" id="bitrateSelect" value="3000">
                       <input type="hidden" name="fps"     id="fpsSelect"     value="30">
                       <div>
                         <label class="text-xs text-gray-400 block mb-1">Resolution</label>
                         <select id="resolutionSelect"
                           class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm"
                           onchange="onResolutionChange()">
-                          <option value="720p30"  data-horizontal="1280x720"  data-vertical="720x1280"  data-bitrate="3500"  data-fps="30" selected>720p HD</option>
-                          <option value="720p60"  data-horizontal="1280x720"  data-vertical="720x1280"  data-bitrate="5000"  data-fps="60">720p60 HD</option>
-                          <option value="1080p30" data-horizontal="1920x1080" data-vertical="1080x1920" data-bitrate="6000"  data-fps="30">1080p Full HD</option>
+                          <option value="720p30"  data-horizontal="1280x720"  data-vertical="720x1280"  data-bitrate="3000"  data-fps="30" selected>720p HD</option>
+                          <option value="720p60"  data-horizontal="1280x720"  data-vertical="720x1280"  data-bitrate="4500"  data-fps="60">720p60 HD</option>
+                          <option value="1080p30" data-horizontal="1920x1080" data-vertical="1080x1920" data-bitrate="5000"  data-fps="30">1080p Full HD</option>
                           <option value="1080p60" data-horizontal="1920x1080" data-vertical="1080x1920" data-bitrate="8000"  data-fps="60">1080p60 Full HD</option>
                           <option value="1440p30" data-horizontal="2560x1440" data-vertical="1440x2560" data-bitrate="10000" data-fps="30">1440p QHD</option>
                           <option value="1440p60" data-horizontal="2560x1440" data-vertical="1440x2560" data-bitrate="14000" data-fps="60">1440p60 QHD</option>
+                          <option value="2160p30" data-horizontal="3840x2160" data-vertical="2160x3840" data-bitrate="25000" data-fps="30">2160p 4K</option>
+                          <option value="2160p60" data-horizontal="3840x2160" data-vertical="2160x3840" data-bitrate="35000" data-fps="60">2160p60 4K</option>
                         </select>
                         <div class="text-xs text-gray-500 mt-1">
                           <span id="currentResolution">1280x720</span>
                           <span>•</span>
-                          <span id="currentBitrateFps">30fps • 3500 kbps</span>
+                          <span id="currentBitrateFps">30fps • 3000 kbps</span>
                         </div>
                       </div>
                       <div>
@@ -463,7 +476,6 @@
                   </div>
                 </div>
               </div>
-            </div>
             </div>
 
             <div id="youtubeStreamForm" class="hidden">
@@ -841,12 +853,23 @@
                 </div>
               </div>
             </div>
-            <div class="space-y-4">
+            </div><!-- end editManualStreamForm -->
+
+            <!-- ── Overlay Panel (Edit Stream) ── -->
+            <div id="editOverlayPanel" class="mt-4 border-t border-gray-700 pt-4">
+              <div id="editOverlayContent"><!-- rendered by renderOverlayPanel('edit') --></div>
+            </div>
+
+            <!-- ── Advanced Settings (Edit Stream) ── -->
+            <div id="editAdvancedSettingsWrapper" class="space-y-4">
               <div class="pt-2 border-t border-gray-700">
                 <button type="button" id="editAdvancedSettingsToggle"
                   class="flex items-center justify-between w-full text-left">
                   <div class="flex items-center">
-                    <span class="text-sm font-medium text-white">Advanced Settings</span>
+                    <div class="flex items-center gap-2">
+                      <i class="ti ti-settings text-gray-400"></i>
+                      <span class="text-sm font-medium text-white"> Advanced Settings</span>
+                    </div>
                     <div class="relative ml-2 group">
                       <i class="ti ti-info-circle text-gray-400 hover:text-primary"></i>
                       <div
@@ -878,24 +901,26 @@
                   <div class="space-y-4">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <!-- Hidden fields — diisi otomatis oleh JS -->
-                      <input type="hidden" name="bitrate" id="editBitrate" value="3500">
+                      <input type="hidden" name="bitrate" id="editBitrate" value="3000">
                       <input type="hidden" name="fps"     id="editFps"     value="30">
                       <div>
                         <label class="text-xs text-gray-400 block mb-1">Resolution</label>
                         <select id="editResolutionSelect"
                           class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm"
                           onchange="onEditResolutionChange()">
-                          <option value="720p30"  data-horizontal="1280x720"  data-vertical="720x1280"  data-bitrate="3500"  data-fps="30" selected>720p HD</option>
-                          <option value="720p60"  data-horizontal="1280x720"  data-vertical="720x1280"  data-bitrate="5000"  data-fps="60">720p60 HD</option>
-                          <option value="1080p30" data-horizontal="1920x1080" data-vertical="1080x1920" data-bitrate="6000"  data-fps="30">1080p Full HD</option>
+                          <option value="720p30"  data-horizontal="1280x720"  data-vertical="720x1280"  data-bitrate="3000"  data-fps="30" selected>720p HD</option>
+                          <option value="720p60"  data-horizontal="1280x720"  data-vertical="720x1280"  data-bitrate="4500"  data-fps="60">720p60 HD</option>
+                          <option value="1080p30" data-horizontal="1920x1080" data-vertical="1080x1920" data-bitrate="5000"  data-fps="30">1080p Full HD</option>
                           <option value="1080p60" data-horizontal="1920x1080" data-vertical="1080x1920" data-bitrate="8000"  data-fps="60">1080p60 Full HD</option>
                           <option value="1440p30" data-horizontal="2560x1440" data-vertical="1440x2560" data-bitrate="10000" data-fps="30">1440p QHD</option>
                           <option value="1440p60" data-horizontal="2560x1440" data-vertical="1440x2560" data-bitrate="14000" data-fps="60">1440p60 QHD</option>
+                          <option value="2160p30" data-horizontal="3840x2160" data-vertical="2160x3840" data-bitrate="25000" data-fps="30">2160p 4K</option>
+                          <option value="2160p60" data-horizontal="3840x2160" data-vertical="2160x3840" data-bitrate="35000" data-fps="60">2160p60 4K</option>
                         </select>
                         <div class="text-xs text-gray-500 mt-1">
                           <span id="editCurrentResolution">1280x720</span>
                           <span>•</span>
-                          <span id="editCurrentBitrateFps">30fps • 3500 kbps</span>
+                          <span id="editCurrentBitrateFps">30fps • 3000 kbps</span>
                         </div>
                       </div>
                       <div>
@@ -917,11 +942,6 @@
                   </div>
                 </div>
               </div>
-            </div>
-
-            <!-- ── Overlay Panel (Edit Stream) ── -->
-            <div id="editOverlayPanel" class="mt-4 border-t border-gray-700 pt-4">
-              <div id="editOverlayContent"><!-- rendered by renderOverlayPanel('edit') --></div>
             </div>
 
             <div id="editYoutubeStreamForm" class="hidden">
@@ -1582,7 +1602,8 @@
           category: document.getElementById('ytCategory').value,
           tags: document.getElementById('ytTags').value,
           loopVideo: true,
-          ytChannelId: document.getElementById('ytSelectedChannelId')?.value || ''
+          ytChannelId: document.getElementById('ytSelectedChannelId')?.value || '',
+          ...getOverlayFormData('new')
         };
         
         const enableSchedule = document.getElementById('ytEnableSchedule').checked;
@@ -1620,6 +1641,7 @@
             .then(data => {
               if (data.success) {
                 showToast('success', 'YouTube stream created successfully!');
+                _cleanupLogoOnSave('new');
                 closeNewStreamModal();
                 setTimeout(() => window.location.reload(), 1000);
               } else {
@@ -1645,6 +1667,7 @@
             .then(data => {
               if (data.success) {
                 showToast('success', 'YouTube stream created successfully!');
+                _cleanupLogoOnSave('new');
                 closeNewStreamModal();
                 setTimeout(() => window.location.reload(), 1000);
               } else {
@@ -1693,7 +1716,8 @@
         loopVideo: document.querySelector('input[name="loopVideo"]').checked,
         orientation: currentOrientation,
         resolution: document.getElementById('currentResolution').textContent,
-        useAdvancedSettings: !document.getElementById('advancedSettingsContent').classList.contains('hidden')
+        useAdvancedSettings: !document.getElementById('advancedSettingsContent').classList.contains('hidden'),
+        ...getOverlayFormData('new')
       };
       const scheduleStartTime = document.getElementById('scheduleStartTime').value;
       const scheduleEndTime = document.getElementById('scheduleEndTime').value;
@@ -1723,6 +1747,7 @@
         .then(data => {
           if (data.success) {
             showToast('success', 'Stream created successfully!');
+            _cleanupLogoOnSave('new');
             closeNewStreamModal();
             setTimeout(() => {
               window.location.reload();
@@ -1911,10 +1936,10 @@
         settingsDisplay = 'Playlist • Loading...';
         fetchPlaylistInfo(stream.video_id, stream.id);
       } else if (stream.use_advanced_settings) {
-        settingsDisplay = `${stream.resolution || '1280x720'} • ${stream.bitrate || '3500'}kbps`;
+        settingsDisplay = `${stream.resolution || '1280x720'} • ${stream.bitrate || '3000'}kbps`;
       } else {
         const videoRes = '1280x720';
-        const videoBitrate = '3500';
+        const videoBitrate = '3000';
         settingsDisplay = `${videoRes} • ${videoBitrate}kbps`;
       }
       let statusBadge = '';
@@ -1987,10 +2012,10 @@
         settingsDisplay = 'Playlist • Loading...';
         fetchPlaylistInfo(stream.video_id, stream.id);
       } else if (stream.use_advanced_settings) {
-        settingsDisplay = `${stream.resolution || '1280x720'} • ${stream.bitrate || '3500'} kbps • ${stream.fps || '30'} FPS`;
+        settingsDisplay = `${stream.resolution || '1280x720'} • ${stream.bitrate || '3000'} kbps • ${stream.fps || '30'} FPS`;
       } else {
         const videoRes = '1280x720';
-        const videoBitrate = '3500';
+        const videoBitrate = '3000';
         const videoFps = '30';
         settingsDisplay = `${videoRes} • ${videoBitrate} kbps • ${videoFps} FPS`;
       }
@@ -2450,20 +2475,22 @@
       const autoBtn = document.getElementById('autoModeBtn');
       const manualForm = document.getElementById('manualStreamForm');
       const youtubeForm = document.getElementById('youtubeStreamForm');
-      
+      const newAdvancedWrapper = document.getElementById('newAdvancedSettingsWrapper');
+
       if (!manualBtn || !autoBtn || !manualForm || !youtubeForm) {
         return;
       }
-      
+
       const manualStreamTitle = document.getElementById('streamTitle');
       const manualRtmpUrl = document.getElementById('rtmpUrl');
       const manualStreamKey = document.getElementById('streamKey');
-      
+
       if (mode === 'manual') {
         manualBtn.className = 'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors bg-primary text-white';
         autoBtn.className = 'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-gray-400 hover:text-white hover:bg-dark-700';
         manualForm.classList.remove('hidden');
         youtubeForm.classList.add('hidden');
+        if (newAdvancedWrapper) newAdvancedWrapper.classList.remove('hidden');
         
         if (manualStreamTitle) manualStreamTitle.required = true;
         if (manualRtmpUrl) manualRtmpUrl.required = true;
@@ -2473,11 +2500,12 @@
         manualBtn.className = 'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-gray-400 hover:text-white hover:bg-dark-700';
         manualForm.classList.add('hidden');
         youtubeForm.classList.remove('hidden');
-        
+        if (newAdvancedWrapper) newAdvancedWrapper.classList.add('hidden');
+
         if (manualStreamTitle) manualStreamTitle.required = false;
         if (manualRtmpUrl) manualRtmpUrl.required = false;
         if (manualStreamKey) manualStreamKey.required = false;
-        
+
         loadYoutubeVideos();
       }
     }
@@ -2821,21 +2849,23 @@
       const autoBtn = document.getElementById('editAutoModeBtn');
       const manualForm = document.getElementById('editManualStreamForm');
       const youtubeForm = document.getElementById('editYoutubeStreamForm');
-      
+      const editAdvancedWrapper = document.getElementById('editAdvancedSettingsWrapper');
+
       if (!manualBtn || !autoBtn || !manualForm || !youtubeForm) {
         return;
       }
-      
+
       const editStreamTitle = document.getElementById('editStreamTitle');
       const editRtmpUrl = document.getElementById('editRtmpUrl');
       const editStreamKey = document.getElementById('editStreamKey');
-      
+
       if (mode === 'manual') {
         manualBtn.className = 'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors bg-primary text-white';
         autoBtn.className = 'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-gray-400 hover:text-white hover:bg-dark-700';
         manualForm.classList.remove('hidden');
         youtubeForm.classList.add('hidden');
-        
+        if (editAdvancedWrapper) editAdvancedWrapper.classList.remove('hidden');
+
         if (editStreamTitle) editStreamTitle.required = true;
         if (editRtmpUrl) editRtmpUrl.required = true;
         if (editStreamKey) editStreamKey.required = true;
@@ -2844,11 +2874,12 @@
         manualBtn.className = 'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-gray-400 hover:text-white hover:bg-dark-700';
         manualForm.classList.add('hidden');
         youtubeForm.classList.remove('hidden');
-        
+        if (editAdvancedWrapper) editAdvancedWrapper.classList.add('hidden');
+
         if (editStreamTitle) editStreamTitle.required = false;
         if (editRtmpUrl) editRtmpUrl.required = false;
         if (editStreamKey) editStreamKey.required = false;
-        
+
         loadEditYoutubeVideos();
       }
     }
@@ -3195,6 +3226,8 @@
         modeSelector.classList.add('hidden');
         manualForm.classList.add('hidden');
         youtubeForm.classList.remove('hidden');
+        const editAdvancedWrapper = document.getElementById('editAdvancedSettingsWrapper');
+        if (editAdvancedWrapper) editAdvancedWrapper.classList.add('hidden');
         
         document.getElementById('editYtStreamTitle').value = stream.title || '';
         document.getElementById('editYtDescription').value = stream.youtube_description || '';
@@ -3360,6 +3393,9 @@
         advancedSettingsContent.classList.add('hidden');
         advancedSettingsCheckbox.checked = false;
       }
+      // Populate overlay panel
+      renderOverlayPanel('edit', stream);
+
       const modal = document.getElementById('editStreamModal');
       document.body.style.overflow = 'hidden';
       modal.classList.remove('hidden');
@@ -3381,11 +3417,12 @@
       const minutes = String(serverDate.getMinutes()).padStart(2, '0');
       return `${year}-${month}-${day}T${hours}:${minutes}`;
     }
-    function closeEditStreamModal() {      
+    function closeEditStreamModal() {
       const modal = document.getElementById('editStreamModal');
-      
+
       modal.classList.remove('active');
-      
+      _cleanupLogoOnCancel('edit');
+
       resetEditModalForm();
       
       const editDurationBadge = document.getElementById('editDurationBadge');
@@ -3706,7 +3743,8 @@
               category: document.getElementById('editYtCategory').value,
               tags: document.getElementById('editYtTags').value,
               loopVideo: true,
-              ytChannelId: document.getElementById('editYtSelectedChannelId')?.value || ''
+              ytChannelId: document.getElementById('editYtSelectedChannelId')?.value || '',
+              ...getOverlayFormData('edit')
             };
             
             const enableSchedule = document.getElementById('editYtEnableSchedule').checked;
@@ -3745,6 +3783,7 @@
                 .then(data => {
                   if (data.success) {
                     showToast('success', 'Stream updated successfully!');
+                    _cleanupLogoOnSave('edit');
                     closeEditStreamModal();
                     setTimeout(() => window.location.reload(), 1000);
                   } else {
@@ -3770,6 +3809,7 @@
                 .then(data => {
                   if (data.success) {
                     showToast('success', 'Stream updated successfully!');
+                    _cleanupLogoOnSave('edit');
                     closeEditStreamModal();
                     setTimeout(() => window.location.reload(), 1000);
                   } else {
@@ -3801,7 +3841,8 @@
             loopVideo: document.getElementById('editLoopVideo').checked,
             orientation: currentEditOrientation,
             resolution: document.getElementById('editCurrentResolution').textContent,
-            useAdvancedSettings: !document.getElementById('editAdvancedSettingsContent').classList.contains('hidden')
+            useAdvancedSettings: !document.getElementById('editAdvancedSettingsContent').classList.contains('hidden'),
+            ...getOverlayFormData('edit')
           };
           const scheduleStartTime = document.getElementById('editScheduleStartTime').value;
           const scheduleEndTime = document.getElementById('editScheduleEndTime').value;
@@ -3827,6 +3868,7 @@
             .then(data => {
               if (data.success) {
                 showToast('success', 'Stream updated successfully!');
+                _cleanupLogoOnSave('edit');
                 closeEditStreamModal();
                 setTimeout(() => {
                   window.location.reload();
@@ -4326,6 +4368,7 @@
 
     const _origCloseNewStreamModal = typeof closeNewStreamModal === 'function' ? closeNewStreamModal : null;
     function closeNewStreamModal() {
+      _cleanupLogoOnCancel('new');
       if (_origCloseNewStreamModal) _origCloseNewStreamModal();
       else {
         const modal = document.getElementById('newStreamModal');
@@ -4338,6 +4381,266 @@
         }
       }
     }
+    // ──────────────────── OVERLAY LOGO & SCROLLING TEXT ────────────────────
+
+    // State for uploaded logo paths (kept in memory, submitted with form)
+    const _overlayLogoPath = { new: '', edit: '' };
+    const _overlayLogoOriginal = { new: '', edit: '' };
+    const _overlayLogoUploaded = { new: [], edit: [] };
+    const _overlayLogoSaved = { new: false, edit: false };
+
+    function _deleteLogoFiles(paths) {
+      const toDelete = paths.filter(p => p && typeof p === 'string');
+      if (!toDelete.length) return;
+      const csrfToken = document.querySelector('input[name="_csrf"]')?.value;
+      fetch('/api/upload/logo', {
+        method: 'DELETE',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+        body: JSON.stringify({ paths: toDelete })
+      }).catch(() => {});
+    }
+
+    function _cleanupLogoOnSave(prefix) {
+      const active = _overlayLogoPath[prefix];
+      const original = _overlayLogoOriginal[prefix];
+      const toDelete = [];
+      if (original && original !== active) toDelete.push(original);
+      _overlayLogoUploaded[prefix].forEach(p => { if (p !== active) toDelete.push(p); });
+      _deleteLogoFiles(toDelete);
+      _overlayLogoUploaded[prefix] = [];
+      _overlayLogoOriginal[prefix] = active;
+      _overlayLogoSaved[prefix] = true;
+    }
+
+    function _cleanupLogoOnCancel(prefix) {
+      if (_overlayLogoSaved[prefix]) { _overlayLogoSaved[prefix] = false; return; }
+      _deleteLogoFiles(_overlayLogoUploaded[prefix]);
+      _overlayLogoUploaded[prefix] = [];
+    }
+
+    function renderOverlayPanel(prefix, streamData) {
+      const container = document.getElementById(prefix === 'edit' ? 'editOverlayContent' : 'newOverlayContent');
+      if (!container) return;
+
+      const existingLogoPath = streamData ? (streamData.overlay_logo_path || '') : '';
+      const existingLogoPos = streamData ? (streamData.overlay_logo_position || 'bottom-right') : 'bottom-right';
+      const existingLogoScale = streamData ? (streamData.overlay_logo_scale || 0.15) : 0.15;
+      const existingLogoOpacity = streamData && streamData.overlay_logo_opacity != null ? streamData.overlay_logo_opacity : 0.8;
+      const existingText = streamData ? (streamData.scrolling_text || '') : '';
+      const existingTextSpeed = streamData ? (streamData.scrolling_text_speed || 100) : 100;
+      const existingTextPos = streamData ? (streamData.scrolling_text_position || 'bottom') : 'bottom';
+      const existingTextColor = streamData && streamData.scrolling_text_color ? '#' + streamData.scrolling_text_color.replace('#', '') : '#ffffff';
+      const existingTextBgColor = streamData && streamData.scrolling_text_bg_color ? '#' + streamData.scrolling_text_bg_color.replace('#', '') : '#000000';
+      const existingTextBgOpacity = streamData && streamData.scrolling_text_bg_opacity != null ? streamData.scrolling_text_bg_opacity : 100;
+      const existingTextSize = streamData ? (streamData.scrolling_text_size || 28) : 28;
+
+      _overlayLogoPath[prefix] = existingLogoPath;
+      _overlayLogoOriginal[prefix] = existingLogoPath;
+      _overlayLogoUploaded[prefix] = [];
+      _overlayLogoSaved[prefix] = false;
+
+      const logoPreviewHtml = existingLogoPath
+        ? `<img src="${existingLogoPath}" class="h-12 rounded object-contain" alt="Logo">`
+        : `<span class="text-xs text-gray-500">No logo uploaded</span>`;
+
+      container.innerHTML = `
+        <div class="space-y-4">
+          <!-- Toggle header -->
+          <button type="button" id="${prefix}OverlayToggle" onclick="toggleOverlaySection('${prefix}')"
+            class="flex items-center justify-between w-full text-left">
+            <div class="flex items-center gap-2">
+              <i class="ti ti-layout text-gray-400"></i>
+              <span class="text-sm font-medium text-white">Overlay & Scrolling Text</span>
+            </div>
+            <i id="${prefix}OverlayChevron" class="ti ti-chevron-down text-gray-400 transition-transform"></i>
+          </button>
+
+          <div id="${prefix}OverlaySectionContent" class="hidden space-y-5 pt-1">
+            <!-- Logo Section -->
+            <div class="bg-dark-700/50 rounded-lg p-4 space-y-3">
+              <p class="text-xs font-medium text-gray-300 uppercase tracking-wider">Logo Overlay</p>
+              <div class="flex items-center gap-3">
+                <div id="${prefix}LogoPreview" class="w-16 h-12 bg-dark-700 rounded border border-gray-600 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  ${logoPreviewHtml}
+                </div>
+                <div class="flex-1 space-y-1">
+                  <input type="file" id="${prefix}LogoFileInput" accept=".png,.jpg,.gif,.webp" class="hidden"
+                    onchange="handleLogoUpload('${prefix}', this)">
+                  <button type="button" onclick="document.getElementById('${prefix}LogoFileInput').click()"
+                    class="px-3 py-1.5 bg-dark-600 hover:bg-dark-500 border border-gray-600 rounded text-xs text-white transition-colors">
+                    <i class="ti ti-upload mr-1"></i>Upload Logo
+                  </button>
+                  ${existingLogoPath ? `<button type="button" onclick="clearOverlayLogo('${prefix}')" class="ml-2 px-2 py-1.5 bg-red-900/30 hover:bg-red-900/50 border border-red-700/50 rounded text-xs text-red-400 transition-colors"><i class="ti ti-x"></i></button>` : ''}
+                  <p class="text-xs text-gray-500">PNG/JPG/GIF/WebP, max 2MB</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3" id="${prefix}LogoOptions" style="${existingLogoPath ? '' : 'opacity:0.5;pointer-events:none'}">
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">Position</label>
+                  <select id="${prefix}LogoPosition" class="w-full h-9 px-2 bg-dark-700 border border-gray-600 rounded text-xs">
+                    <option value="bottom-right" ${existingLogoPos === 'bottom-right' ? 'selected' : ''}>Bottom Right</option>
+                    <option value="bottom-left" ${existingLogoPos === 'bottom-left' ? 'selected' : ''}>Bottom Left</option>
+                    <option value="center" ${existingLogoPos === 'center' ? 'selected' : ''}>Center</option>
+                    <option value="top-right" ${existingLogoPos === 'top-right' ? 'selected' : ''}>Top Right</option>
+                    <option value="top-left" ${existingLogoPos === 'top-left' ? 'selected' : ''}>Top Left</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">Scale <span id="${prefix}ScaleVal" class="text-primary">${Math.round(existingLogoScale * 100)}%</span></label>
+                  <input type="range" id="${prefix}LogoScale" min="2" max="50" value="${Math.round(existingLogoScale * 100)}"
+                    oninput="document.getElementById('${prefix}ScaleVal').textContent=this.value+'%'"
+                    class="w-full h-1.5 accent-primary cursor-pointer">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">Opacity <span id="${prefix}OpacityVal" class="text-primary">${Math.round(existingLogoOpacity * 100)}%</span></label>
+                  <input type="range" id="${prefix}LogoOpacity" min="0" max="100" value="${Math.round(existingLogoOpacity * 100)}"
+                    oninput="document.getElementById('${prefix}OpacityVal').textContent=this.value+'%'"
+                    class="w-full h-1.5 accent-primary cursor-pointer">
+                </div>
+              </div>
+            </div>
+
+            <!-- Scrolling Text Section -->
+            <div class="bg-dark-700/50 rounded-lg p-4 space-y-3">
+              <p class="text-xs font-medium text-gray-300 uppercase tracking-wider">Scrolling Text (Ticker)</p>
+              <div>
+                <label class="text-xs text-gray-400 block mb-1">Text Content</label>
+                <input type="text" id="${prefix}ScrollText" value="${existingText.replace(/"/g, '&quot;')}"
+                  placeholder="Enter ticker text... (leave empty to disable)"
+                  class="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">Position</label>
+                  <select id="${prefix}TextPosition" class="w-full h-9 px-2 bg-dark-700 border border-gray-600 rounded text-xs">
+                    <option value="bottom" ${existingTextPos === 'bottom' ? 'selected' : ''}>Bottom</option>
+                    <option value="top" ${existingTextPos === 'top' ? 'selected' : ''}>Top</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">Speed <span id="${prefix}SpeedVal" class="text-primary">${existingTextSpeed}</span> px/s</label>
+                  <input type="range" id="${prefix}TextSpeed" min="20" max="300" value="${existingTextSpeed}"
+                    oninput="document.getElementById('${prefix}SpeedVal').textContent=this.value"
+                    class="w-full h-1.5 accent-primary cursor-pointer">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">Text Color</label>
+                  <input type="color" id="${prefix}TextColor" value="${existingTextColor}"
+                    class="w-full h-9 bg-dark-700 border border-gray-600 rounded cursor-pointer p-0.5">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">Font Size <span id="${prefix}SizeVal" class="text-primary">${existingTextSize}px</span></label>
+                  <input type="range" id="${prefix}TextSize" min="12" max="80" value="${existingTextSize}"
+                    oninput="document.getElementById('${prefix}SizeVal').textContent=this.value+'px'"
+                    class="w-full h-1.5 accent-primary cursor-pointer">
+                </div>
+              </div>
+              <div class="space-y-2 mt-1">
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">Background Color</label>
+                  <input type="color" id="${prefix}TextBgColor" value="${existingTextBgColor}"
+                    style="opacity:${existingTextBgOpacity/100}"
+                    oninput="document.getElementById('${prefix}TextBgColor').style.opacity=document.getElementById('${prefix}TextBgOpacity').value/100"
+                    class="w-full h-9 bg-dark-700 border border-gray-600 rounded cursor-pointer p-0.5">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">BG Opacity <span id="${prefix}BgOpacityVal" class="text-primary">${existingTextBgOpacity}%</span></label>
+                  <input type="range" id="${prefix}TextBgOpacity" min="0" max="100" value="${existingTextBgOpacity}"
+                    oninput="document.getElementById('${prefix}BgOpacityVal').textContent=this.value+'%'; document.getElementById('${prefix}TextBgColor').style.opacity=this.value/100"
+                    class="w-full h-1.5 accent-primary cursor-pointer">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function toggleOverlaySection(prefix) {
+      const content = document.getElementById(prefix + 'OverlaySectionContent');
+      const chevron = document.getElementById(prefix + 'OverlayChevron');
+      if (!content) return;
+      const isHidden = content.classList.toggle('hidden');
+      if (chevron) chevron.style.transform = isHidden ? '' : 'rotate(180deg)';
+    }
+
+    function handleLogoUpload(prefix, input) {
+      const file = input.files[0];
+      if (!file) return;
+      const csrfToken = document.querySelector('input[name="_csrf"]')?.value;
+      const formData = new FormData();
+      formData.append('logo', file);
+
+      const preview = document.getElementById(prefix + 'LogoPreview');
+      if (preview) preview.innerHTML = '<span class="text-xs text-gray-400 animate-pulse">Uploading...</span>';
+
+      fetch('/api/upload/logo', {
+        method: 'POST',
+        headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+        body: formData
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            _overlayLogoPath[prefix] = data.path;
+            _overlayLogoUploaded[prefix].push(data.path);
+            if (preview) preview.innerHTML = `<img src="${data.path}?t=${Date.now()}" class="h-12 rounded object-contain" alt="Logo">`;
+            const opts = document.getElementById(prefix + 'LogoOptions');
+            if (opts) { opts.style.opacity = '1'; opts.style.pointerEvents = 'auto'; }
+            showToast('success', 'Logo uploaded');
+          } else {
+            if (preview) preview.innerHTML = '<span class="text-xs text-red-400">Upload failed</span>';
+            showToast('error', data.error || 'Logo upload failed');
+          }
+        })
+        .catch(() => {
+          if (preview) preview.innerHTML = '<span class="text-xs text-red-400">Error</span>';
+          showToast('error', 'Logo upload error');
+        });
+    }
+
+    function clearOverlayLogo(prefix) {
+      _overlayLogoPath[prefix] = '';
+      const preview = document.getElementById(prefix + 'LogoPreview');
+      if (preview) preview.innerHTML = '<span class="text-xs text-gray-500">No logo uploaded</span>';
+      const opts = document.getElementById(prefix + 'LogoOptions');
+      if (opts) { opts.style.opacity = '0.5'; opts.style.pointerEvents = 'none'; }
+    }
+
+    function getOverlayFormData(prefix) {
+      const logoPath = _overlayLogoPath[prefix] || '';
+      const logoPos = document.getElementById(prefix + 'LogoPosition')?.value || 'bottom-right';
+      const logoScaleEl = document.getElementById(prefix + 'LogoScale');
+      const logoScale = logoScaleEl ? parseFloat(logoScaleEl.value) / 100 : 0.15;
+      const logoOpacityEl = document.getElementById(prefix + 'LogoOpacity');
+      const logoOpacity = logoOpacityEl ? parseFloat(logoOpacityEl.value) / 100 : 1.0;
+      const scrollText = document.getElementById(prefix + 'ScrollText')?.value.trim() || '';
+      const textSpeed = parseInt(document.getElementById(prefix + 'TextSpeed')?.value) || 80;
+      const textPos = document.getElementById(prefix + 'TextPosition')?.value || 'bottom';
+      const textColor = (document.getElementById(prefix + 'TextColor')?.value || '#ffffff').replace('#', '');
+      const textBgColor = (document.getElementById(prefix + 'TextBgColor')?.value || '#000000').replace('#', '');
+      const textBgOpacity = parseInt(document.getElementById(prefix + 'TextBgOpacity')?.value) ?? 80;
+      const textSize = parseInt(document.getElementById(prefix + 'TextSize')?.value) || 28;
+
+      return {
+        overlay_logo_path: logoPath,
+        overlay_logo_position: logoPos,
+        overlay_logo_scale: logoScale,
+        overlay_logo_opacity: logoOpacity,
+        scrolling_text: scrollText,
+        scrolling_text_speed: textSpeed,
+        scrolling_text_position: textPos,
+        scrolling_text_color: textColor,
+        scrolling_text_bg_color: textBgColor,
+        scrolling_text_bg_opacity: textBgOpacity,
+        scrolling_text_size: textSize
+      };
+    }
+
+    // Initialize overlay panels on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      renderOverlayPanel('new', null);
+    });
     // ────────────────────────────────────────────────────────────────────────
   </script>
 

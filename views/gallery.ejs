@@ -147,7 +147,7 @@
         <!-- Folder + file grid view -->
         <div id="gridView">
           <!-- Folders row -->
-          <div id="folderGridContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-4"></div>
+          <div id="folderGridContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 mb-4"></div>
           <!-- Files grid -->
           <% if (videos && videos.length > 0) { %>
             <div id="fileGridContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -436,10 +436,10 @@
                     class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors inline-block cursor-pointer">
                     <span>Select files</span>
                     <input type="file" name="media"
-                      accept="video/mp4,video/avi,video/quicktime,video/x-matroska,video/webm,video/x-flv,video/x-ms-wmv,video/x-m4v,video/mpeg,video/mp2t,application/octet-stream"
+                      accept="video/mp4,video/avi,video/x-msvideo,video/quicktime,video/webm,.mp4,.avi,.mov,.webm"
                       multiple class="hidden" id="mediaFileInput">
                   </label>
-                  <p id="dropzoneFormats" class="text-gray-500 text-xs">Supported formats: MP4, AVI, MOV, and more (max 50GB)</p>
+                  <p id="dropzoneFormats" class="text-gray-500 text-xs">Supported formats: MP4, AVI, MOV, and WEBM (max 50GB)</p>
                 </div>
               </div>
               <div id="selectedFileInfo" class="hidden">
@@ -490,6 +490,20 @@
       </div>
     </div>
 
+    <!-- Bottom Upload Progress Bar -->
+    <div id="bottomUploadBar" class="fixed bottom-0 left-0 right-0 bg-dark-800 border-t border-dark-600 z-40 hidden">
+      <div class="flex items-center gap-3 px-4 py-2.5 max-w-screen-2xl mx-auto">
+        <i class="ti ti-upload text-primary text-sm shrink-0"></i>
+        <span class="text-sm text-gray-400 truncate flex-1 min-w-0" id="bottomUploadStatus">Uploading...</span>
+        <div class="w-40 bg-dark-600 rounded-full h-1.5 shrink-0">
+          <div id="bottomProgressBar" class="bg-primary h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <span class="text-sm text-gray-300 shrink-0 w-10 text-right" id="bottomProgressPercent">0%</span>
+        <button onclick="cancelActiveOperation()" class="text-red-400 hover:text-red-300 shrink-0" title="Cancel">
+          <i class="ti ti-x text-sm"></i></button>
+      </div>
+    </div>
+
     <div id="cloudImportModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden modal-overlay overflow-y-auto">
       <div class="flex min-h-screen items-center justify-center p-4">
         <div id="cloudModalContent" class="bg-dark-800 rounded-lg shadow-xl w-full max-w-md">
@@ -532,6 +546,15 @@
 
       loadDiskUsage();
       loadFolders();
+
+      function reloadKeepingFolder() {
+        if (currentFolderId !== null) {
+          sessionStorage.setItem('restoreFolder', String(currentFolderId));
+        } else {
+          sessionStorage.removeItem('restoreFolder');
+        }
+        window.location.reload();
+      }
 
       // ============================================================
       // DISK USAGE
@@ -607,6 +630,13 @@
           const data = await res.json();
           if (data.success) {
             allFolders = data.folders || [];
+            const restoreId = sessionStorage.getItem('restoreFolder');
+            if (restoreId) {
+              sessionStorage.removeItem('restoreFolder');
+              const folderId = isNaN(restoreId) ? restoreId : Number(restoreId);
+              const folder = allFolders.find(f => String(f.id) === String(folderId));
+              if (folder) { navigateToFolder(folderId); return; }
+            }
             renderFolders();
             renderBreadcrumb();
           }
@@ -631,8 +661,8 @@
         // Back button when inside a folder
         if (currentFolderId !== null) {
           const back = document.createElement('div');
-          back.className = 'group bg-dark-700 rounded-lg overflow-hidden border border-transparent hover:border-gray-600 hover:bg-dark-600 transition-all cursor-pointer flex flex-col items-center justify-center p-4 aspect-video';
-          back.innerHTML = `<i class="ti ti-arrow-back-up text-2xl text-gray-400 group-hover:text-white transition-colors mb-2"></i><span class="text-xs text-gray-400 group-hover:text-white">..</span>`;
+          back.className = 'group bg-dark-700 rounded-lg border border-transparent hover:border-gray-600 hover:bg-dark-600 transition-all cursor-pointer flex items-center gap-2 px-3 py-2';
+          back.innerHTML = `<i class="ti ti-arrow-back-up text-base text-gray-400 group-hover:text-white transition-colors flex-shrink-0"></i><span class="text-xs text-gray-400 group-hover:text-white truncate">..</span>`;
           back.onclick = () => navigateUp();
           container.appendChild(back);
         }
@@ -652,8 +682,9 @@
         folders.forEach(folder => {
           const row = document.createElement('div');
           row.className = 'flex items-center justify-between px-4 py-2 hover:bg-dark-700 rounded-lg cursor-pointer group mb-1';
+          row.addEventListener('click', () => navigateToFolder(folder.id));
           row.innerHTML = `
-            <div class="flex items-center gap-3" onclick="navigateToFolder('${folder.id}')">
+            <div class="flex items-center gap-3">
               <i class="ti ti-folder text-yellow-400 text-xl"></i>
               <span class="text-sm font-medium">${folder.name}</span>
             </div>
@@ -674,25 +705,19 @@
 
       function createFolderCard(folder) {
         const card = document.createElement('div');
-        card.className = 'group bg-dark-700 rounded-lg overflow-hidden border border-transparent hover:border-yellow-500/40 hover:bg-dark-600 transition-all cursor-pointer relative';
+        card.className = 'group bg-dark-700 rounded-lg border border-transparent hover:border-yellow-500/40 hover:bg-dark-600 transition-all cursor-pointer relative flex items-center gap-2 px-3 py-2';
         card.innerHTML = `
-          <div class="aspect-video flex items-center justify-center bg-dark-900 relative">
-            <i class="ti ti-folder text-yellow-400 text-5xl group-hover:text-yellow-300 transition-colors"></i>
-            <!-- folder action buttons -->
-            <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button class="w-6 h-6 flex items-center justify-center bg-dark-700/90 rounded text-gray-300 hover:text-white hover:bg-dark-600 transition-colors" title="Rename"
-                onclick="event.stopPropagation(); openRenameFolderModal('${folder.id}', '${folder.name.replace(/'/g,"\\'")}')">
-                <i class="ti ti-pencil text-xs"></i>
-              </button>
-              <button class="w-6 h-6 flex items-center justify-center bg-dark-700/90 rounded text-gray-300 hover:text-red-400 hover:bg-dark-600 transition-colors" title="Delete"
-                onclick="event.stopPropagation(); confirmDeleteFolder('${folder.id}', '${folder.name.replace(/'/g,"\\'")}')">
-                <i class="ti ti-trash text-xs"></i>
-              </button>
-            </div>
-          </div>
-          <div class="p-3">
-            <h3 class="font-medium text-sm truncate">${folder.name}</h3>
-            <p class="text-xs text-gray-400 mt-0.5">Folder</p>
+          <i class="ti ti-folder text-yellow-400 text-lg group-hover:text-yellow-300 transition-colors flex-shrink-0"></i>
+          <span class="text-xs font-medium truncate flex-1">${folder.name}</span>
+          <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+            <button class="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-white hover:bg-dark-500 transition-colors" title="Rename"
+              onclick="event.stopPropagation(); openRenameFolderModal('${folder.id}', '${folder.name.replace(/'/g,"\\'")}')">
+              <i class="ti ti-pencil text-xs"></i>
+            </button>
+            <button class="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-red-400 hover:bg-dark-500 transition-colors" title="Delete"
+              onclick="event.stopPropagation(); confirmDeleteFolder('${folder.id}', '${folder.name.replace(/'/g,"\\'")}')">
+              <i class="ti ti-trash text-xs"></i>
+            </button>
           </div>
         `;
         card.addEventListener('click', () => navigateToFolder(folder.id));
@@ -982,7 +1007,7 @@
           const data = await res.json();
           if (data.success) {
             showToast('success', action === 'move' ? 'File moved successfully' : 'File copied successfully');
-            setTimeout(() => window.location.reload(), 1000);
+            setTimeout(() => reloadKeepingFolder(), 1000);
           } else {
             showToast('error', data.error || `Failed to ${action} file`);
           }
@@ -1089,7 +1114,7 @@
 
         if (failCount === 0) showToast('success', `${successCount} file${successCount > 1 ? 's' : ''} deleted`);
         else showToast('warning', `${successCount} deleted, ${failCount} failed`);
-        setTimeout(() => window.location.reload(), 1000);
+        setTimeout(() => reloadKeepingFolder(), 1000);
       }
 
       // ============================================================
@@ -1164,7 +1189,7 @@
           showToast('warning', `${successCount} ${verb}, ${failCount} failed`);
         }
 
-        setTimeout(() => window.location.reload(), 1000);
+        setTimeout(() => reloadKeepingFolder(), 1000);
       }
 
       // ============================================================
@@ -1172,6 +1197,7 @@
       // ============================================================
       document.getElementById('gridViewBtn').addEventListener('click', function () {
         currentView = 'grid';
+        sessionStorage.setItem('galleryView', 'grid');
         document.getElementById('gridView').classList.remove('hidden');
         document.getElementById('selectAllBtn').classList.remove('hidden');
         document.getElementById('listView').classList.add('hidden');
@@ -1183,6 +1209,7 @@
 
       document.getElementById('listViewBtn').addEventListener('click', function () {
         currentView = 'list';
+        sessionStorage.setItem('galleryView', 'list');
         document.getElementById('listView').classList.remove('hidden');
         document.getElementById('gridView').classList.add('hidden');
         document.getElementById('selectAllBtn').classList.add('hidden');
@@ -1191,6 +1218,11 @@
         document.getElementById('gridViewBtn').classList.remove('bg-primary', 'text-white');
         document.getElementById('gridViewBtn').classList.add('text-gray-400');
       });
+
+      // Restore view preference
+      if (sessionStorage.getItem('galleryView') === 'list') {
+        document.getElementById('listViewBtn').click();
+      }
 
       // ============================================================
       // MEDIA PLAYER
@@ -1285,7 +1317,7 @@
           try {
             const response = await fetch(`/api/videos/${videoId}`, { method: 'DELETE' });
             const data = await response.json();
-            if (data.success) { showToast('success', 'Video deleted successfully'); setTimeout(() => window.location.reload(), 1000); }
+            if (data.success) { showToast('success', 'Video deleted successfully'); setTimeout(() => reloadKeepingFolder(), 1000); }
             else showToast('error', data.error || 'Failed to delete video');
           } catch (e) { showToast('error', 'An error occurred while deleting'); }
         }
@@ -1363,15 +1395,15 @@
           tabAudio.className = 'flex-1 py-2 px-4 rounded-lg bg-dark-700 text-gray-400 hover:text-white transition-colors';
           dropzoneIcon.className = 'ti ti-video text-2xl text-gray-400';
           dropzoneText.textContent = 'Drag and drop video files here';
-          dropzoneFormats.textContent = 'Supported formats: MP4, AVI, MOV, and more (max 50GB)';
-          mediaFileInput.accept = 'video/mp4,video/avi,video/quicktime,video/x-matroska,video/webm,video/x-flv,video/x-ms-wmv,video/x-m4v,video/mpeg,video/mp2t,application/octet-stream';
+          dropzoneFormats.textContent = 'Supported formats: MP4, AVI, MOV, and WEBM (max 50GB)';
+          mediaFileInput.accept = 'video/mp4,video/avi,video/x-msvideo,video/quicktime,video/webm,.mp4,.avi,.mov,.webm';
         } else {
           tabVideo.className = 'flex-1 py-2 px-4 rounded-lg bg-dark-700 text-gray-400 hover:text-white transition-colors';
           tabAudio.className = 'flex-1 py-2 px-4 rounded-lg bg-primary text-white transition-colors';
           dropzoneIcon.className = 'ti ti-music text-2xl text-gray-400';
           dropzoneText.textContent = 'Drag and drop audio files here';
-          dropzoneFormats.textContent = 'Supported formats: MP3, WAV, AAC, and more';
-          mediaFileInput.accept = 'audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/aac,audio/mp4,audio/x-m4a,audio/ogg,audio/flac';
+          dropzoneFormats.textContent = 'Supported formats: MP3, WAV, AAC, M4A, OGG, FLAC, and WMA';
+          mediaFileInput.accept = 'audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/aac,audio/mp4,audio/x-m4a,audio/ogg,audio/flac,audio/x-flac,audio/x-ms-wma,audio/wma,.mp3,.wav,.aac,.m4a,.ogg,.flac,.wma';
         }
         resetUploadForm();
       }
@@ -1384,8 +1416,7 @@
       }
 
       function closeUploadModal() {
-        const modal = document.getElementById('uploadModal');
-        modal.classList.add('hidden');
+        document.getElementById('uploadModal').classList.add('hidden');
         document.body.classList.remove('overflow-hidden');
         resetUploadForm();
       }
@@ -1463,53 +1494,75 @@
           try {
             const body = {};
             body[config.urlField] = link;
+            if (currentFolderId !== null) body.folder_id = currentFolderId;
             const response = await fetch(config.endpoint, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('input[name="_csrf"]').value },
               body: JSON.stringify(body)
             });
             const result = await response.json();
-            if (result.success) { showImportProgress(result.jobId); closeCloudModal(); }
+            if (result.success) { showImportProgress(result.jobId, config.title); closeCloudModal(); }
             else { showToast('error', result.error || 'Failed to import video'); this.disabled = false; this.innerHTML = '<i class="ti ti-download mr-2"></i>Import Video'; }
           } catch (e) { showToast('error', 'An error occurred while importing'); this.disabled = false; this.innerHTML = '<i class="ti ti-download mr-2"></i>Import Video'; }
         });
       }
 
-      function showImportProgress(jobId) {
-        const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm modal-overlay';
-        modal.id = 'import-progress-modal';
-        modal.innerHTML = `
-          <div class="bg-dark-800 rounded-lg p-6 w-full max-w-sm mx-4">
-            <div class="text-center">
-              <div class="w-16 h-16 mb-4 rounded-full bg-primary/10 mx-auto flex items-center justify-center">
-                <i id="progress-icon" class="ti ti-download text-primary text-2xl"></i>
-              </div>
-              <p id="progress-status" class="text-sm text-gray-300 mb-4">Starting download...</p>
-              <div class="w-full bg-dark-700 rounded-full h-2.5 mb-4">
-                <div id="progress-bar" class="bg-primary h-2.5 rounded-full transition-all" style="width: 0%"></div>
-              </div>
-              <button onclick="document.getElementById('import-progress-modal').remove()" class="text-sm text-gray-500 hover:text-white">Close</button>
-            </div>
-          </div>`;
-        document.body.appendChild(modal);
-        const interval = setInterval(async () => {
+      let activeImportJobId = null;
+      let activeImportInterval = null;
+
+      async function cancelCloudImport() {
+        if (activeImportInterval) { clearInterval(activeImportInterval); activeImportInterval = null; }
+        if (activeImportJobId) {
+          try { await fetch(`/api/videos/import/${activeImportJobId}`, { method: 'DELETE' }); } catch (e) {}
+          activeImportJobId = null;
+        }
+        hideBottomBar();
+        showToast('warning', 'Import cancelled');
+      }
+
+      async function cancelActiveOperation() {
+        if (activeXHR || activeAbortController) {
+          await cancelUpload();
+        } else if (activeImportJobId) {
+          await cancelCloudImport();
+        }
+      }
+
+      function showImportProgress(jobId, providerName) {
+        activeImportJobId = jobId;
+        showBottomBar(`Importing from ${providerName || 'cloud'}...`);
+        const bb = document.getElementById('bottomProgressBar');
+        const bp = document.getElementById('bottomProgressPercent');
+        if (bb) bb.style.width = '0%';
+        if (bp) bp.textContent = '0%';
+
+        activeImportInterval = setInterval(async () => {
+          if (!activeImportJobId || activeImportJobId !== jobId) { clearInterval(activeImportInterval); return; }
           try {
             const response = await fetch(`/api/videos/import-status/${jobId}`);
             const data = await response.json();
-            if (!data.success) { clearInterval(interval); return; }
+            if (!data.success) { clearInterval(activeImportInterval); activeImportInterval = null; activeImportJobId = null; hideBottomBar(); return; }
             const status = data.status;
-            document.getElementById('progress-bar').style.width = `${status.progress}%`;
-            document.getElementById('progress-status').textContent = status.message;
+            if (bb) bb.style.width = `${status.progress}%`;
+            if (bp) bp.textContent = `${status.progress}%`;
+            const bs = document.getElementById('bottomUploadStatus');
+            if (bs) bs.textContent = status.message;
             if (status.status === 'complete') {
-              document.getElementById('progress-icon').className = 'ti ti-check text-green-400 text-2xl';
+              clearInterval(activeImportInterval); activeImportInterval = null; activeImportJobId = null;
+              hideBottomBar();
               showToast('success', 'Video imported successfully');
-              setTimeout(() => window.location.reload(), 1500);
-              clearInterval(interval);
+              setTimeout(() => reloadKeepingFolder(), 1500);
             } else if (status.status === 'failed') {
-              document.getElementById('progress-icon').className = 'ti ti-x text-red-400 text-2xl';
+              clearInterval(activeImportInterval); activeImportInterval = null; activeImportJobId = null;
+              hideBottomBar();
               showToast('error', status.message || 'Import failed');
-              clearInterval(interval);
+            } else if (status.status === 'skipped') {
+              clearInterval(activeImportInterval); activeImportInterval = null; activeImportJobId = null;
+              hideBottomBar();
+              showToast('warning', status.message || 'Format is not supported, import skipped');
+            } else if (status.status === 'cancelled') {
+              clearInterval(activeImportInterval); activeImportInterval = null; activeImportJobId = null;
+              hideBottomBar();
             }
           } catch (e) { console.error(e); }
         }, 1000);
@@ -1523,17 +1576,51 @@
       const MAX_RETRIES = 3;
       const RETRY_DELAY_MS = 1000;
 
+      // Upload cancellation state
+      let activeXHR = null;
+      let activeAbortController = null;
+      let activeUploadId = null;
+      let uploadCancelled = false;
+
+      function showBottomBar(statusText) {
+        const bar = document.getElementById('bottomUploadBar');
+        if (bar) bar.classList.remove('hidden');
+        const s = document.getElementById('bottomUploadStatus');
+        if (s) s.textContent = statusText || 'Uploading...';
+      }
+
+      function hideBottomBar() {
+        const bar = document.getElementById('bottomUploadBar');
+        if (bar) bar.classList.add('hidden');
+      }
+
+      async function cancelUpload() {
+        uploadCancelled = true;
+        if (activeXHR) { activeXHR.abort(); activeXHR = null; }
+        if (activeAbortController) { activeAbortController.abort(); activeAbortController = null; }
+        if (activeUploadId) {
+          try { await fetch(`/api/videos/chunk/${activeUploadId}`, { method: 'DELETE' }); } catch (e) {}
+          activeUploadId = null;
+        }
+        hideBottomBar();
+        resetUploadForm();
+      }
+
+      const ALLOWED_AUDIO_EXTS = ['.mp3','.wav','.aac','.m4a','.ogg','.flac','.wma'];
+      const ALLOWED_VIDEO_EXTS = ['.mp4','.avi','.mov','.webm'];
+
       function isAudioFile(file) {
-        const audioTypes = ['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/aac','audio/mp4','audio/x-m4a','audio/ogg','audio/flac','audio/x-flac'];
-        const audioExts = ['.mp3','.wav','.aac','.m4a','.ogg','.flac'];
+        const audioTypes = ['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/aac','audio/mp4','audio/x-m4a','audio/ogg','audio/flac','audio/x-flac','audio/x-ms-wma','audio/wma'];
         const ext = '.' + file.name.split('.').pop().toLowerCase();
-        return audioTypes.includes(file.type) || audioExts.includes(ext);
+        return audioTypes.includes(file.type) || ALLOWED_AUDIO_EXTS.includes(ext);
       }
       function isVideoFile(file) {
-        const videoTypes = ['video/mp4','video/avi','video/quicktime','video/x-msvideo','video/x-matroska','video/webm','video/x-flv','video/x-ms-wmv','video/x-m4v','video/mpeg','video/mp2t','application/octet-stream'];
-        const videoExts = ['.mp4','.avi','.mov','.mkv','.webm','.flv','.wmv','.m4v','.ts','.mpeg','.mpg'];
+        const videoTypes = ['video/mp4','video/avi','video/x-msvideo','video/quicktime','video/webm'];
         const ext = '.' + file.name.split('.').pop().toLowerCase();
-        return videoTypes.includes(file.type) || videoExts.includes(ext);
+        return videoTypes.includes(file.type) || ALLOWED_VIDEO_EXTS.includes(ext);
+      }
+      function isSupportedFile(file) {
+        return isAudioFile(file) || isVideoFile(file);
       }
 
       // ============================================================
@@ -1615,7 +1702,7 @@
           : 'No items found';
 
         renderPagination();
-        updateSelectAllState();
+        updateBulkBar();
       }
 
       function renderPagination() {
@@ -1689,6 +1776,15 @@
           mediaFileInput.addEventListener('change', function () {
             const newFiles = Array.from(this.files);
             if (newFiles.length > 0) {
+              const unsupported = newFiles.filter(f => !isSupportedFile(f));
+              if (unsupported.length > 0) {
+                const names = unsupported.map(f => f.name).join(', ');
+                const isVideo = !document.getElementById('tabAudio')?.classList.contains('bg-primary');
+                const hint = isVideo ? 'Only MP4, AVI, MOV, and WEBM files are supported.' : 'Only MP3, WAV, AAC, M4A, OGG, FLAC, and WMA files are supported.';
+                showToast('warning', `Format is not supported: ${names}. ${hint}`);
+                this.value = '';
+                return;
+              }
               const maxSize = 50 * 1024 * 1024 * 1024;
               const large = newFiles.filter(f => f.size > maxSize);
               if (large.length > 0) { showToast('error', `File too large: ${large.map(f => f.name).join(', ')}`); this.value = ''; return; }
@@ -1741,48 +1837,46 @@
         if (uploadButton) {
           uploadButton.addEventListener('click', async function () {
             if (selectedFiles.length === 0) return;
-            uploadDropzone.classList.add('hidden');
-            selectedFileInfo.classList.add('hidden');
-            uploadProgress.classList.remove('hidden');
-            uploadButton.disabled = true;
+            uploadCancelled = false;
+
+            // Close modal immediately, show bottom bar
+            document.getElementById('uploadModal').classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+            showBottomBar(`Uploading 1/${selectedFiles.length}: ${selectedFiles[0].name}`);
 
             let success = 0, failed = [], failedErrors = [];
-            uploadFilesList.innerHTML = '';
-            selectedFiles.forEach((f) => {
-              const isAudio = isAudioFile(f);
-              const icon = isAudio ? 'ti-music' : 'ti-video';
-              const div = document.createElement('div');
-              div.className = 'flex items-center justify-between p-2 rounded-lg';
-              div.innerHTML = `
-                <div class="flex items-center gap-3 min-w-0">
-                  <div class="w-8 h-8 rounded bg-dark-600 flex items-center justify-center shrink-0">
-                    <i class="ti ${icon} text-gray-400 text-sm"></i>
-                  </div>
-                  <span class="text-sm truncate">${f.name}</span>
-                </div>
-                <span class="file-status text-xs text-gray-500">Waiting</span>`;
-              uploadFilesList.appendChild(div);
-            });
 
             for (let i = 0; i < selectedFiles.length; i++) {
+              if (uploadCancelled) break;
               const file = selectedFiles[i];
               const isAudio = isAudioFile(file);
-              uploadProgressStatus.textContent = `Uploading ${i + 1}/${selectedFiles.length}: ${file.name}`;
-              updateFileProgress(i, 'uploading', 0);
+              const statusText = `Uploading ${i + 1}/${selectedFiles.length}: ${file.name}`;
+              const bStatus = document.getElementById('bottomUploadStatus');
+              if (bStatus) bStatus.textContent = statusText;
               if (!checkDiskLimit(file.size)) {
                 showToast('error', `Not enough server disk space to upload ${file.name}`);
                 failed.push(file.name); failedErrors.push('Insufficient server disk space');
-                updateFileProgress(i, 'error', 0); continue;
+                continue;
               }
               const result = isAudio ? await uploadAudio(file, i, selectedFiles.length) : await uploadFile(file, i, selectedFiles.length);
-              if (result.success) { success++; updateFileProgress(i, 'success', 100); }
-              else { failed.push(file.name); failedErrors.push(result.error || 'Unknown error'); updateFileProgress(i, 'error', 0); }
+              if (result.error === 'cancelled') break;
+              if (result.success) { success++; }
+              else { failed.push(file.name); failedErrors.push(result.error || 'Unknown error'); }
+            }
+
+            activeXHR = null; activeAbortController = null; activeUploadId = null;
+            hideBottomBar();
+
+            if (uploadCancelled) {
+              showToast('warning', 'Upload cancelled');
+              resetUploadForm();
+              return;
             }
 
             if (failed.length === 0) showToast('success', `${success} file${success > 1 ? 's' : ''} uploaded successfully`);
             else if (failed.length === 1) showToast('warning', `Upload failed for "${failed[0]}": ${failedErrors[0] || ''}`);
             else showToast('warning', `${success} uploaded, ${failed.length} failed`);
-            setTimeout(() => window.location.reload(), 2000);
+            setTimeout(() => reloadKeepingFolder(), 2000);
           });
         }
 
@@ -1795,6 +1889,10 @@
           const overall = Math.round(((index + loadedBytes / totalBytes) / total) * 100);
           uploadProgressBar.style.width = `${overall}%`;
           uploadProgressPercent.textContent = `${overall}%`;
+          const bb = document.getElementById('bottomProgressBar');
+          const bp = document.getElementById('bottomProgressPercent');
+          if (bb) bb.style.width = `${overall}%`;
+          if (bp) bp.textContent = `${overall}%`;
           updateFileProgress(index, status, filePct);
         }
 
@@ -1813,7 +1911,9 @@
             if (!file || !(file instanceof File)) return resolve({ success: false, error: 'File tidak valid' });
             const formData = new FormData();
             formData.append('audio', file);
+            if (currentFolderId !== null) formData.append('folder_id', String(currentFolderId));
             const xhr = new XMLHttpRequest();
+            activeXHR = xhr;
             xhr.timeout = Math.max(2, Math.ceil(file.size / (10 * 1024 * 1024))) * 60 * 1000;
             xhr.upload.addEventListener('progress', (e) => {
               if (!e.lengthComputable) return;
@@ -1821,16 +1921,22 @@
               const overall = Math.round(((index + e.loaded / e.total) / total) * 100);
               if (uploadProgressBar) uploadProgressBar.style.width = `${overall}%`;
               if (uploadProgressPercent) uploadProgressPercent.textContent = `${overall}%`;
+              const bb = document.getElementById('bottomProgressBar');
+              const bp = document.getElementById('bottomProgressPercent');
+              if (bb) bb.style.width = `${overall}%`;
+              if (bp) bp.textContent = `${overall}%`;
               updateFileProgress(index, 'uploading', pct);
             });
             xhr.addEventListener('load', () => {
+              activeXHR = null;
               if (xhr.status === 200) {
                 try { const r = JSON.parse(xhr.responseText); resolve({ success: r.success, error: r.error || null }); }
                 catch { resolve({ success: false, error: 'Parse error' }); }
               } else { resolve({ success: false, error: `HTTP ${xhr.status}` }); }
             });
-            xhr.addEventListener('error', () => resolve({ success: false, error: 'Network error' }));
-            xhr.addEventListener('timeout', () => resolve({ success: false, error: 'Timeout' }));
+            xhr.addEventListener('abort', () => { activeXHR = null; resolve({ success: false, error: 'cancelled' }); });
+            xhr.addEventListener('error', () => { activeXHR = null; resolve({ success: false, error: 'Network error' }); });
+            xhr.addEventListener('timeout', () => { activeXHR = null; resolve({ success: false, error: 'Timeout' }); });
             xhr.open('POST', '/api/audio/upload', true);
             xhr.send(formData);
           });
@@ -1840,49 +1946,62 @@
           return new Promise((resolve) => {
             const formData = new FormData();
             formData.append('video', file);
+            if (currentFolderId !== null) formData.append('folder_id', String(currentFolderId));
             const xhr = new XMLHttpRequest();
+            activeXHR = xhr;
             xhr.timeout = 30 * 60 * 1000;
             xhr.upload.addEventListener('progress', (e) => { if (e.lengthComputable) updateProgress(index, total, e.loaded, e.total, 'uploading'); });
             xhr.addEventListener('load', () => {
+              activeXHR = null;
               if (xhr.status === 200) {
                 try { const r = JSON.parse(xhr.responseText); resolve({ success: r.success, error: r.error || null }); }
                 catch { resolve({ success: false, error: 'Invalid server response' }); }
               } else { resolve({ success: false, error: `HTTP ${xhr.status}` }); }
             });
-            xhr.addEventListener('error', () => resolve({ success: false, error: 'Network error' }));
-            xhr.addEventListener('timeout', () => resolve({ success: false, error: 'Upload timed out' }));
+            xhr.addEventListener('abort', () => { activeXHR = null; resolve({ success: false, error: 'cancelled' }); });
+            xhr.addEventListener('error', () => { activeXHR = null; resolve({ success: false, error: 'Network error' }); });
+            xhr.addEventListener('timeout', () => { activeXHR = null; resolve({ success: false, error: 'Upload timed out' }); });
             xhr.open('POST', '/api/videos/upload', true);
             xhr.send(formData);
           });
         }
 
         async function uploadChunked(file, index, total) {
+          const abortController = new AbortController();
+          activeAbortController = abortController;
+          const { signal } = abortController;
+
           let initData;
           try {
             const initResp = await fetch('/api/videos/chunk/init', {
-              method: 'POST',
+              method: 'POST', signal,
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ filename: file.name, fileSize: file.size, totalChunks: Math.ceil(file.size / CHUNK_SIZE) })
             });
-            if (!initResp.ok) return { success: false, error: `Init failed: HTTP ${initResp.status}` };
             initData = await initResp.json();
-            if (!initData.success) return { success: false, error: initData.error || 'Init failed' };
-          } catch (e) { return { success: false, error: `Init error: ${e.message}` }; }
+            if (!initResp.ok || !initData.success) return { success: false, error: initData.error || `Init failed: HTTP ${initResp.status}` };
+          } catch (e) {
+            if (e.name === 'AbortError') return { success: false, error: 'cancelled' };
+            return { success: false, error: `Init error: ${e.message}` };
+          }
 
           const { uploadId } = initData;
+          activeUploadId = uploadId;
           const serverChunkSize = initData.chunkSize || CHUNK_SIZE;
           const totalChunks = Math.ceil(file.size / serverChunkSize);
           let uploadedChunks = new Set(initData.uploadedChunks || []);
 
           for (let i = 0; i < totalChunks; i++) {
+            if (signal.aborted) return { success: false, error: 'cancelled' };
             if (uploadedChunks.has(i)) { updateProgress(index, total, Math.min((i + 1) * serverChunkSize, file.size), file.size, 'uploading'); continue; }
             const start = i * serverChunkSize;
             const chunk = file.slice(start, Math.min(start + serverChunkSize, file.size));
             let success = false, lastError = null;
             for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+              if (signal.aborted) return { success: false, error: 'cancelled' };
               try {
                 const res = await fetch('/api/videos/chunk/upload', {
-                  method: 'POST',
+                  method: 'POST', signal,
                   headers: { 'Content-Type': 'application/octet-stream', 'X-Upload-Id': uploadId, 'X-Chunk-Index': String(i) },
                   body: chunk
                 });
@@ -1891,22 +2010,32 @@
                 if (!data.success) { lastError = data.error || 'Chunk upload failed'; throw new Error(lastError); }
                 uploadedChunks = new Set(data.uploadedChunks || []);
                 success = true; break;
-              } catch (e) { lastError = e.message; if (attempt < MAX_RETRIES - 1) await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (attempt + 1))); }
+              } catch (e) {
+                if (e.name === 'AbortError') return { success: false, error: 'cancelled' };
+                lastError = e.message;
+                if (attempt < MAX_RETRIES - 1) await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
+              }
             }
-            if (!success) return { success: false, error: `Chunk ${i} gagal: ${lastError}` };
+            if (!success) { activeAbortController = null; activeUploadId = null; return { success: false, error: `Chunk ${i} gagal: ${lastError}` }; }
             updateProgress(index, total, Math.min((i + 1) * serverChunkSize, file.size), file.size, 'uploading');
           }
 
+          if (signal.aborted) return { success: false, error: 'cancelled' };
           try {
             const completeResp = await fetch('/api/videos/chunk/complete', {
-              method: 'POST',
+              method: 'POST', signal,
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ uploadId })
+              body: JSON.stringify({ uploadId, folder_id: currentFolderId !== null ? currentFolderId : null })
             });
+            activeAbortController = null; activeUploadId = null;
             if (!completeResp.ok) return { success: false, error: `Complete failed: HTTP ${completeResp.status}` };
             const completeData = await completeResp.json();
             return { success: completeData.success, error: completeData.error || null };
-          } catch (e) { return { success: false, error: `Complete error: ${e.message}` }; }
+          } catch (e) {
+            activeAbortController = null; activeUploadId = null;
+            if (e.name === 'AbortError') return { success: false, error: 'cancelled' };
+            return { success: false, error: `Complete error: ${e.message}` };
+          }
         }
 
         if (uploadDropzone) {

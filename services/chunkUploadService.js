@@ -130,11 +130,14 @@ async function mergeChunks(uploadId) {
   try {
     for (let i = 0; i < info.totalChunks; i++) {
       const chunkPath = getChunkPath(uploadId, i);
+      // Read chunk fully then write via callback — guarantees data is flushed
+      // before moving to the next chunk (pipe+end event resolves too early on Windows)
+      const chunkData = await fs.readFile(chunkPath);
       await new Promise((resolve, reject) => {
-        const readStream = fs.createReadStream(chunkPath);
-        readStream.on('error', reject);
-        readStream.on('end', resolve);
-        readStream.pipe(writeStream, { end: false });
+        writeStream.write(chunkData, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
       });
     }
     await new Promise((resolve, reject) => {
@@ -143,8 +146,7 @@ async function mergeChunks(uploadId) {
       writeStream.end();
     });
   } catch (err) {
-    // Close the stream and remove the incomplete merged file to free disk space
-    await new Promise((resolve) => writeStream.destroy(null, resolve)).catch(() => {});
+    writeStream.destroy();
     await fs.remove(finalPath).catch(() => {});
     if (err.code === 'ENOSPC') {
       throw new Error('ENOSPC: Server disk is full. Cannot merge video file.');

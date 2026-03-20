@@ -1,6 +1,6 @@
 {
   "name": "streamflow",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Cloud streaming solution with FFmpeg forked by cakapbagus",
   "main": "app.js",
   "scripts": {

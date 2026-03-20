@@ -1,0 +1,158 @@
+<% layout('layout') -%>
+<div class="space-y-6">
+  <!-- Header -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+    <div>
+      <h2 class="text-2xl font-bold">How to Normalize Your Videos</h2>
+      <p class="text-gray-400 text-sm mt-1">Convert and normalize your videos before uploading using HandBrake</p>
+    </div>
+  </div>
+
+  <!-- Step 1: Download HandBrake -->
+  <div class="bg-dark-800 rounded-xl border border-gray-700/50 p-6">
+    <div class="flex items-start gap-4">
+      <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm">1</div>
+      <div class="flex-1">
+        <h2 class="text-base font-semibold text-white mb-1">Download HandBrake</h2>
+        <p class="text-gray-400 text-sm mb-4">HandBrake is a free, open-source video transcoder. Download and install it on your computer before proceeding.</p>
+        <a href="https://handbrake.fr/downloads.php" target="_blank" rel="noopener noreferrer"
+          class="inline-flex items-center gap-2 bg-primary hover:bg-secondary text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+          <i class="ti ti-download text-base"></i>
+          Download HandBrake
+          <i class="ti ti-external-link text-xs opacity-70"></i>
+        </a>
+        <p class="text-xs text-gray-500 mt-3">Available for Windows, macOS, and Linux</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Download Presets -->
+  <div class="bg-dark-800 rounded-xl border border-gray-700/50 p-6">
+    <div class="flex items-start gap-4">
+      <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm">2</div>
+      <div class="flex-1">
+        <h2 class="text-base font-semibold text-white mb-1">Download Streamflow Presets</h2>
+        <p class="text-gray-400 text-sm mb-4">Download the Streamflow preset file for HandBrake. These presets have multiple options optimized for video streaming.</p>
+        <a href="/handbrake/handbrake_streamflow_presets.json" download="handbrake_streamflow_presets.json"
+          class="inline-flex items-center gap-2 bg-dark-700 hover:bg-dark-600 border border-gray-600 hover:border-gray-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+          <i class="ti ti-file-download text-base"></i>
+          Download Presets (.json)
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Import Presets into HandBrake -->
+  <div class="bg-dark-800 rounded-xl border border-gray-700/50 p-6">
+    <div class="flex items-start gap-4">
+      <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm">3</div>
+      <div class="flex-1">
+        <h2 class="text-base font-semibold text-white mb-1">Import Presets into HandBrake</h2>
+        <p class="text-gray-400 text-sm mb-4">Once HandBrake is installed and the preset file is downloaded, follow these steps to import it.</p>
+        <ol class="space-y-3">
+          <li class="flex items-start gap-3">
+            <span class="flex-shrink-0 text-xs font-medium text-primary bg-primary/10 rounded px-1.5 py-0.5 mt-0.5">a</span>
+            <div>
+              <p class="text-sm text-gray-200">Open <span class="font-medium text-white">HandBrake</span></p>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="flex-shrink-0 text-xs font-medium text-primary bg-primary/10 rounded px-1.5 py-0.5 mt-0.5">b</span>
+            <div>
+              <p class="text-sm text-gray-200">In the top menu, click <span class="font-medium text-white">Presets</span> &rarr; <span class="font-medium text-white">Import from file</span></p>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="flex-shrink-0 text-xs font-medium text-primary bg-primary/10 rounded px-1.5 py-0.5 mt-0.5">c</span>
+            <div>
+              <p class="text-sm text-gray-200">Browse to the downloaded <span class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded text-gray-300">handbrake_streamflow_presets.json</span> file and click <span class="font-medium text-white">Open</span></p>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="flex-shrink-0 text-xs font-medium text-primary bg-primary/10 rounded px-1.5 py-0.5 mt-0.5">d</span>
+            <div>
+              <p class="text-sm text-gray-200">A category named <span class="font-medium text-white">Streamflow</span> will appear in the preset selection</p>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4: Normalize a Video -->
+  <div class="bg-dark-800 rounded-xl border border-gray-700/50 p-6">
+    <div class="flex items-start gap-4">
+      <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm">4</div>
+      <div class="flex-1">
+        <h2 class="text-base font-semibold text-white mb-1">Normalize Your Video</h2>
+        <p class="text-gray-400 text-sm mb-4">With the presets imported, you can now convert any video to a streaming-ready format.</p>
+        <ol class="space-y-3">
+          <li class="flex items-start gap-3">
+            <span class="flex-shrink-0 text-xs font-medium text-primary bg-primary/10 rounded px-1.5 py-0.5 mt-0.5">a</span>
+            <div>
+              <p class="text-sm text-gray-200">Click <span class="font-medium text-white">Open Source</span> and select the video file you want to normalize</p>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="flex-shrink-0 text-xs font-medium text-primary bg-primary/10 rounded px-1.5 py-0.5 mt-0.5">b</span>
+            <div>
+              <p class="text-sm text-gray-200">In the <span class="font-medium text-white">Preset</span> list, choose the preset that matches your desired output resolution:</p>
+              <div class="mt-2 space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs bg-dark-700 border border-gray-600 px-2 py-0.5 rounded text-gray-300 font-mono">Streamflow 720p30 HD</span>
+                  <span class="text-xs text-gray-500">— 1280×720, 30fps, ~3 Mbps</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs bg-dark-700 border border-gray-600 px-2 py-0.5 rounded text-gray-300 font-mono">Streamflow 720p60 HD</span>
+                  <span class="text-xs text-gray-500">— 1280×720, 60fps, ~4.5 Mbps</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs bg-dark-700 border border-gray-600 px-2 py-0.5 rounded text-gray-300 font-mono">Streamflow 1080p30 FHD</span>
+                  <span class="text-xs text-gray-500">— 1920×1080, 30fps, ~5 Mbps</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs bg-dark-700 border border-gray-600 px-2 py-0.5 rounded text-gray-300 font-mono">Streamflow 1080p60 FHD</span>
+                  <span class="text-xs text-gray-500">— 1920×1080, 60fps, ~8 Mbps</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs bg-dark-700 border border-gray-600 px-2 py-0.5 rounded text-gray-300 font-mono">Streamflow 1440p30 QHD</span>
+                  <span class="text-xs text-gray-500">— 2560×1440, 30fps, ~10 Mbps</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs bg-dark-700 border border-gray-600 px-2 py-0.5 rounded text-gray-300 font-mono">Streamflow 1440p60 QHD</span>
+                  <span class="text-xs text-gray-500">— 2560×1440, 60fps, ~14 Mbps</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs bg-dark-700 border border-gray-600 px-2 py-0.5 rounded text-gray-300 font-mono">Streamflow 2160p30 4K</span>
+                  <span class="text-xs text-gray-500">— 3840×2160, 30fps, ~25 Mbps</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs bg-dark-700 border border-gray-600 px-2 py-0.5 rounded text-gray-300 font-mono">Streamflow 2160p60 4K</span>
+                  <span class="text-xs text-gray-500">— 3840×2160, 60fps, ~35 Mbps</span>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="flex-shrink-0 text-xs font-medium text-primary bg-primary/10 rounded px-1.5 py-0.5 mt-0.5">c</span>
+            <div>
+              <p class="text-sm text-gray-200">Set the output destination in the <span class="font-medium text-white">Save As</span> field at the bottom</p>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="flex-shrink-0 text-xs font-medium text-primary bg-primary/10 rounded px-1.5 py-0.5 mt-0.5">d</span>
+            <div>
+              <p class="text-sm text-gray-200">Click <span class="font-medium text-white">Start Encode</span> and wait for the conversion to finish</p>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="flex-shrink-0 text-xs font-medium text-primary bg-primary/10 rounded px-1.5 py-0.5 mt-0.5">e</span>
+            <div>
+              <p class="text-sm text-gray-200">Upload the converted file to <a href="/gallery" class="text-primary hover:underline">Video Gallery</a></p>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
