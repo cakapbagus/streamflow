@@ -25,7 +25,7 @@ const systemMonitor = require('./services/systemMonitor');
 const { uploadVideo, upload, uploadThumbnail, uploadAudio } = require('./middleware/uploadMiddleware');
 const chunkUploadService = require('./services/chunkUploadService');
 const audioConverter = require('./services/audioConverter');
-const { ensureDirectories } = require('./utils/storage');
+const { ensureDirectories, paths } = require('./utils/storage');
 const { getVideoInfo, generateThumbnail, generateImageThumbnail, ensureAudioTrack } = require('./utils/videoProcessor');
 const Video = require('./models/Video');
 const Playlist = require('./models/Playlist');
@@ -2639,15 +2639,42 @@ async function processGoogleDriveImport(jobId, fileId, userId, folderId = null) 
       return;
     }
 
-    const _allowedImportExts = ['.mp4', '.avi', '.mov', '.webm'];
+    const _allowedVideoExts = ['.mp4', '.avi', '.mov', '.webm'];
+    const _allowedAudioExts = ['.m4a', '.mp3', '.wma', '.aac', '.wav', '.flac', '.ogg'];
     const _importedExt = path.extname(result.filename || result.localFilePath).toLowerCase();
-    if (!_allowedImportExts.includes(_importedExt)) {
+    const _isAudio = _allowedAudioExts.includes(_importedExt);
+    const _isVideo = _allowedVideoExts.includes(_importedExt);
+    if (!_isVideo && !_isAudio) {
       fs.unlink(result.localFilePath, () => {});
       importJobs[jobId] = {
         status: 'skipped',
         progress: 0,
-        message: `Format "${_importedExt || 'unknown'}" is not supported. Only MP4, AVI, MOV, and WebM files can be imported.`
+        message: `Format "${_importedExt || 'unknown'}" is not supported. Only MP4, AVI, MOV, WebM, M4A, MP3, WMA, AAC, WAV, FLAC, and OGG files can be imported.`
       };
+      setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+      return;
+    }
+
+    if (_isAudio) {
+      const audioFilePath = path.join(paths.audio, result.filename);
+      fs.renameSync(result.localFilePath, audioFilePath);
+      Object.assign(importJobs[jobId], { status: 'processing', progress: 100, message: 'Processing audio...' });
+      const normalized = await audioConverter.processAudioFile(audioFilePath, result.filename);
+      const finalFilePath = normalized.filepath;
+      const finalFilename = path.basename(finalFilePath);
+      const audioInfo = await audioConverter.getAudioInfo(finalFilePath);
+      const finalStats = fs.statSync(finalFilePath);
+      const audioData = {
+        title: path.basename(result.filename, path.extname(result.filename)),
+        filepath: `/uploads/audio/${finalFilename}`,
+        file_size: finalStats.size,
+        duration: audioInfo.duration || 0,
+        format: path.extname(finalFilename).replace('.', ''),
+        folder_id: folderId,
+        user_id: userId
+      };
+      const audio = await Video.create(audioData);
+      importJobs[jobId] = { status: 'complete', progress: 100, message: 'Audio imported successfully', videoId: audio.id };
       setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
       return;
     }
@@ -2811,15 +2838,42 @@ async function processMediafireImport(jobId, fileKey, userId, folderId = null) {
       return;
     }
 
-    const _allowedImportExts = ['.mp4', '.avi', '.mov', '.webm'];
+    const _allowedVideoExts = ['.mp4', '.avi', '.mov', '.webm'];
+    const _allowedAudioExts = ['.m4a', '.mp3', '.wma', '.aac', '.wav', '.flac', '.ogg'];
     const _importedExt = path.extname(result.filename || result.localFilePath).toLowerCase();
-    if (!_allowedImportExts.includes(_importedExt)) {
+    const _isAudio = _allowedAudioExts.includes(_importedExt);
+    const _isVideo = _allowedVideoExts.includes(_importedExt);
+    if (!_isVideo && !_isAudio) {
       fs.unlink(result.localFilePath, () => {});
       importJobs[jobId] = {
         status: 'skipped',
         progress: 0,
-        message: `Format "${_importedExt || 'unknown'}" is not supported. Only MP4, AVI, MOV, and WebM files can be imported.`
+        message: `Format "${_importedExt || 'unknown'}" is not supported. Only MP4, AVI, MOV, WebM, M4A, MP3, WMA, AAC, WAV, FLAC, and OGG files can be imported.`
       };
+      setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+      return;
+    }
+
+    if (_isAudio) {
+      const audioFilePath = path.join(paths.audio, result.filename);
+      fs.renameSync(result.localFilePath, audioFilePath);
+      Object.assign(importJobs[jobId], { status: 'processing', progress: 100, message: 'Processing audio...' });
+      const normalized = await audioConverter.processAudioFile(audioFilePath, result.filename);
+      const finalFilePath = normalized.filepath;
+      const finalFilename = path.basename(finalFilePath);
+      const audioInfo = await audioConverter.getAudioInfo(finalFilePath);
+      const finalStats = fs.statSync(finalFilePath);
+      const audioData = {
+        title: path.basename(result.filename, path.extname(result.filename)),
+        filepath: `/uploads/audio/${finalFilename}`,
+        file_size: finalStats.size,
+        duration: audioInfo.duration || 0,
+        format: path.extname(finalFilename).replace('.', ''),
+        folder_id: folderId,
+        user_id: userId
+      };
+      const audio = await Video.create(audioData);
+      importJobs[jobId] = { status: 'complete', progress: 100, message: 'Audio imported successfully', videoId: audio.id };
       setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
       return;
     }
@@ -2962,15 +3016,42 @@ async function processDropboxImport(jobId, dropboxUrl, userId, folderId = null) 
       return;
     }
 
-    const _allowedImportExts = ['.mp4', '.avi', '.mov', '.webm'];
+    const _allowedVideoExts = ['.mp4', '.avi', '.mov', '.webm'];
+    const _allowedAudioExts = ['.m4a', '.mp3', '.wma', '.aac', '.wav', '.flac', '.ogg'];
     const _importedExt = path.extname(result.filename || result.localFilePath).toLowerCase();
-    if (!_allowedImportExts.includes(_importedExt)) {
+    const _isAudio = _allowedAudioExts.includes(_importedExt);
+    const _isVideo = _allowedVideoExts.includes(_importedExt);
+    if (!_isVideo && !_isAudio) {
       fs.unlink(result.localFilePath, () => {});
       importJobs[jobId] = {
         status: 'skipped',
         progress: 0,
-        message: `Format "${_importedExt || 'unknown'}" is not supported. Only MP4, AVI, MOV, and WebM files can be imported.`
+        message: `Format "${_importedExt || 'unknown'}" is not supported. Only MP4, AVI, MOV, WebM, M4A, MP3, WMA, AAC, WAV, FLAC, and OGG files can be imported.`
       };
+      setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+      return;
+    }
+
+    if (_isAudio) {
+      const audioFilePath = path.join(paths.audio, result.filename);
+      fs.renameSync(result.localFilePath, audioFilePath);
+      Object.assign(importJobs[jobId], { status: 'processing', progress: 100, message: 'Processing audio...' });
+      const normalized = await audioConverter.processAudioFile(audioFilePath, result.filename);
+      const finalFilePath = normalized.filepath;
+      const finalFilename = path.basename(finalFilePath);
+      const audioInfo = await audioConverter.getAudioInfo(finalFilePath);
+      const finalStats = fs.statSync(finalFilePath);
+      const audioData = {
+        title: path.basename(result.filename, path.extname(result.filename)),
+        filepath: `/uploads/audio/${finalFilename}`,
+        file_size: finalStats.size,
+        duration: audioInfo.duration || 0,
+        format: path.extname(finalFilename).replace('.', ''),
+        folder_id: folderId,
+        user_id: userId
+      };
+      const audio = await Video.create(audioData);
+      importJobs[jobId] = { status: 'complete', progress: 100, message: 'Audio imported successfully', videoId: audio.id };
       setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
       return;
     }
@@ -3113,15 +3194,42 @@ async function processMegaImport(jobId, megaUrl, userId, folderId = null) {
       return;
     }
 
-    const _allowedImportExts = ['.mp4', '.avi', '.mov', '.webm'];
+    const _allowedVideoExts = ['.mp4', '.avi', '.mov', '.webm'];
+    const _allowedAudioExts = ['.m4a', '.mp3', '.wma', '.aac', '.wav', '.flac', '.ogg'];
     const _importedExt = path.extname(result.filename || result.localFilePath).toLowerCase();
-    if (!_allowedImportExts.includes(_importedExt)) {
+    const _isAudio = _allowedAudioExts.includes(_importedExt);
+    const _isVideo = _allowedVideoExts.includes(_importedExt);
+    if (!_isVideo && !_isAudio) {
       fs.unlink(result.localFilePath, () => {});
       importJobs[jobId] = {
         status: 'skipped',
         progress: 0,
-        message: `Format "${_importedExt || 'unknown'}" is not supported. Only MP4, AVI, MOV, and WebM files can be imported.`
+        message: `Format "${_importedExt || 'unknown'}" is not supported. Only MP4, AVI, MOV, WebM, M4A, MP3, WMA, AAC, WAV, FLAC, and OGG files can be imported.`
       };
+      setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
+      return;
+    }
+
+    if (_isAudio) {
+      const audioFilePath = path.join(paths.audio, result.filename);
+      fs.renameSync(result.localFilePath, audioFilePath);
+      Object.assign(importJobs[jobId], { status: 'processing', progress: 100, message: 'Processing audio...' });
+      const normalized = await audioConverter.processAudioFile(audioFilePath, result.filename);
+      const finalFilePath = normalized.filepath;
+      const finalFilename = path.basename(finalFilePath);
+      const audioInfo = await audioConverter.getAudioInfo(finalFilePath);
+      const finalStats = fs.statSync(finalFilePath);
+      const audioData = {
+        title: path.basename(result.filename, path.extname(result.filename)),
+        filepath: `/uploads/audio/${finalFilename}`,
+        file_size: finalStats.size,
+        duration: audioInfo.duration || 0,
+        format: path.extname(finalFilename).replace('.', ''),
+        folder_id: folderId,
+        user_id: userId
+      };
+      const audio = await Video.create(audioData);
+      importJobs[jobId] = { status: 'complete', progress: 100, message: 'Audio imported successfully', videoId: audio.id };
       setTimeout(() => { delete importJobs[jobId]; }, 5 * 60 * 1000);
       return;
     }
